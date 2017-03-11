@@ -46,20 +46,28 @@ class convolution_neuromag:
             for ch_number in xrange(row_of_edge_matrix):
                 if (row_of_edge_matrix[ch_number]):
                     return avail_channels[ch_number]
-        def recursive_search(accumulator,conv_length,avail_channels,edge_matrix):
+        def recursive_search(curr_ch,conv_length,avail_channels,edge_matrix):
+            res = []
+            curr_ch_index=avail_channels.index(curr_ch)
+            if conv_length == 1:
+                for index,potent_neigh in enumerate(avail_channels):
+                    if edge_matrix[curr_ch_index][index]:
+                        res.extend([potent_neigh])
+                return res
+                edge_matrix[avail_channels.index(curr_ch)]
+            for index,potent_neigh in enumerate(avail_channels):
+                if edge_matrix[curr_ch_index][index]:
+                    new_avail_channels = [ch for ch in avail_channels if ch != potent_neigh]
 
-            for ch_index, ch in enumerate(avail_channels):
-                if conv_length == 1:
-                    
-                    return accumulator
+                    new_edge_matrix = np.delete(edge_matrix, index, 0)
+                    new_edge_matrix = np.delete(edge_matrix, index, 1)
 
-                next_ch = self._find_next_neibor(edge_matrix[ch],avail_channels)
-                accumulator.extend(next_ch)
-                avail_channels.remove(next_ch)
-                edge_matrix = np.delete(edge_matrix, ch_index, 0)
-                edge_matrix = np.delete(edge_matrix, ch_index, 1)
+                    accum = recursive_search(potent_neigh, conv_length-1, new_avail_channels, new_edge_matrix)
+                    accum = [potent_neigh+seq for seq in accum]
+                    res = res+accum
+                    return res
 
-                recursive_search(, conv_length-1, avail_channels, edge_matrix)
+
 
         edge_matrix = self.cacl_edges_matrix()
         recursive_search([], conv_length, self.ch_names, edge_matrix)
