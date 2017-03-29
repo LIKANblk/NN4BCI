@@ -6,7 +6,8 @@ from mne.viz import plot_topomap
 import os
 import matplotlib.pyplot as plt
 
-class convolution_neuromag:
+
+class ConvolutionNeuromag:
     #
     def __init__(self,sensor_type):
         # @sensor_type "mag" or "grad"
@@ -17,16 +18,14 @@ class convolution_neuromag:
             neighboring_filename = 'neuromag306planar_neighb.mat'
         neuromag = read_raw_fif(sample.data_path() +
                           '/MEG/sample/sample_audvis_raw.fif')
-        self.layout = find_layout(neuromag.info, ch_type=self.sensor_type)
-        self.layout_3D = np.array([ch['loc'][:3] for ch in neuromag.info['chs'] if (ch['ch_name'][-1] == '1') & (ch['ch_name'][0:3] == 'MEG')])
+        self.topography_2D = find_layout(neuromag.info, ch_type=self.sensor_type).pos
+        self.topography_3D = np.array([ch['loc'][:3] for ch in neuromag.info['chs'] if (ch['ch_name'][-1] == '1') & (ch['ch_name'][0:3] == 'MEG')])
 
         self.neighboring,self.ch_names = read_ch_connectivity(neighboring_filename, picks=None) #ch. names written  in 'MEG1111' format
         self.neighboring = self.neighboring.toarray()
         self.num_channels = len(self.ch_names)
         self.edges_matrix = self.calc_3D_edges_matrix()
-        #self.neighboring = neighboring.toarray()
 
-    # def visualise_sensors(self):
 
     def calc_3D_edges_matrix(self):
         #We need only upper part of connectivity matrix
@@ -36,8 +35,8 @@ class convolution_neuromag:
         for x in xrange(len(neib_array)):
             for y in xrange(0,len(neib_array)):
               if neib_array[x,y]:
-                edge = np.array((self.layout_3D[x][0]-self.layout_3D[y][0],self.layout_3D[x][1]-self.layout_3D[y][1],
-                                 self.layout_3D[x][2]-self.layout_3D[y][2]))
+                edge = np.array((self.topography_3D[x][0]-self.topography_3D[y][0],self.topography_3D[x][1]-self.topography_3D[y][1],
+                                 self.topography_3D[x][2]-self.topography_3D[y][2]))
                 edges_matrix[x,y] = edge
         return edges_matrix
 
@@ -46,7 +45,7 @@ class convolution_neuromag:
         #@convolution - short list of channel indeceses to be convolved
         # @threshold - ration between singular values, larger wich we consider convolution 1D_planar
         #TODO improve estimation of matrix rank
-        vectors_mat = np.array(self.layout_3D[convolution])
+        vectors_mat = np.array(self.topography_3D[convolution])
         # _,s,_ = np.linalg.svd(vectors_mat)
         return np.linalg.matrix_rank(vectors_mat,threshold) < 3 #TODO DEBUG threshold
 
@@ -57,7 +56,7 @@ class convolution_neuromag:
         print res
 
     def get_1Dconvolution_channels(self,conv_length):
-
+        # Method for searching 1D planara subgraphs
         def recursive_search(curr_ch_index, potential_neighbors, conv_length):
             result = []
             if conv_length == 2: #TODO HACK please fix this
@@ -74,7 +73,7 @@ class convolution_neuromag:
             result = [[curr_ch_index] + elem for elem in result]
             return result
         res = []
-        for ch_index in range(self.num_channels): #TODO debug, fix this
+        for ch_index in range(self.num_channels):
             print ch_index
             potential_neighbors = (range(len(self.ch_names)))
             potential_neighbors.remove(ch_index)
@@ -82,7 +81,7 @@ class convolution_neuromag:
         result = filter(lambda x:self.is_1D_planar(x),res)
         return result
 
-    def __visualise_convolutions__(self,convs):
+    def _visualise_convolutions(self,convs):
         #This function used to test correctness of finded convolutions
         test_conv = './test_conv'
         if not os.path.isdir(test_conv):
@@ -93,21 +92,57 @@ class convolution_neuromag:
             conv_names = [self.ch_names[index] for index in conv]
             title = '_'.join([name[3:] for name in conv_names])
             plt.title('%s,svd ratio' % (title))
-            im,_ = plot_topomap(data=fake_data, pos=self.layout.pos,contours=0,names=self.ch_names,show=False)
+            im,_ = plot_topomap(data=fake_data, pos=self.topography_2D,contours=0,names=self.ch_names,show=False)
             plt.savefig(os.path.join(test_conv,title+'.png'))
             plt.close()
 
+    def _plot_custom_topography(self,sensors_indices,color='b',radius=0.5,connect=False,draw_normal=False):
+
+        # fig, ax = plt.subplots(1, 1)
+        xs = [self.topography_2D[sensor_index][0] for sensor_index in sensors_indices]
+        ys = [self.topography_2D[sensor_index][1] for sensor_index in sensors_indices]
+
+        plt.scatter(xs, ys, s=radius, c=color)
+        if False:
+            plt.plot(xs,ys,c=color)
+
+        is_even = lambda x: x % 2 == 0
+        conv_length = len(sensors_indices)
+        if draw_normal:
+            vectors_xs = np.array([xs[i] - xs[i+1] for i in range(conv_length - 1)])
+            vectors_ys = np.array([ys[i] - ys[i+1] for i in range(conv_length - 1)])
+            norms = np.linalg.norm(np.vstack((vectors_xs,vectors_ys)),axis=0)
+            vectors_xs /= norms
+            vectors_ys /= norms
+            conv_normal = np.array((sum(vectors_ys),-sum(vectors_xs))) #Swap coordinate to get normal vector
+            conv_normal = 0.1*conv_normal/np.linalg.norm(conv_normal)
 
 
+            if ~is_even(conv_length):
+                central_node = sensors_indices[conv_length//2]
+                start_x,start_y=self.topography_2D[central_node][:2]
+                plt.plot([start_x-0.5*conv_normal[0], start_x + 0.5*conv_normal[0]],
+                         [start_y- 0.5*conv_normal[1], start_y + 0.5*conv_normal[1]],c=color)
+            plt.gca().set_aspect('equal', adjustable='box')
 
+    def _visualise_directions(self,convs):
+        #This function visualise each convolution on custom topography with direction of convolution
 
+        test_conv = './test_conv1'
+        if not os.path.isdir(test_conv):
+            os.makedirs(test_conv)
+        for conv_index, conv in enumerate(convs):
+            conv_names = [self.ch_names[index] for index in conv]
+            title = '_'.join([name[3:] for name in conv_names])
+            plt.title('%s,svd ratio' % (title))
+            self._plot_custom_topography(range(self.num_channels))
+            self._plot_custom_topography(conv,color='r',radius=5,connect=True,draw_normal=True)
 
-
+            plt.savefig(os.path.join(test_conv,title+'.png'))
+            plt.close()
 
 if __name__=='__main__':
-    cn = convolution_neuromag('mag')
-    # cn.__empirical_threshold_calculation__()
-    convs = cn.get_1Dconvolutions(3)
-    cn.__visualise_convolutions__(convs)
-
+    cn = ConvolutionNeuromag('mag')
+    convs = cn.get_1Dconvolution_channels(3)
+    cn._visualise_directions(convs)
 
