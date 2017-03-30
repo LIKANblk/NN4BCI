@@ -4,6 +4,7 @@ from scipy.signal import hilbert
 from convolutions import ConvolutionNeuromag
 from itertools import combinations
 from Data import Data
+import matplotlib
 
 
 
@@ -14,7 +15,7 @@ def get_convovled_data(data,convolutions):
 class AlexPreprocess:
     def __init__(self,sensor_type, conv_length):
         self.conv_length=conv_length
-        data_object = Data()
+        data_object = Data()                    #TODO remove data from instanse variables
         self.data = data_object.get_data()
         conv_object = ConvolutionNeuromag(sensor_type)
         self.convolution_indeces = conv_object.get_1Dconvolution_channels(conv_length)
@@ -22,10 +23,10 @@ class AlexPreprocess:
     def extract_expert_features(self):
         phase_data = self._calc_local_phase()
         beta = 0.8
-        trails_length,features_length,time_length = self.data.shape[0],len(self.convolution_indeces),self.data.shape[2]
-        res = np.zeros((trails_length,features_length,time_length))
+        features_length,time_length = len(self.convolution_indeces),self.data.shape[2]
+        res = np.zeros((features_length,time_length))
         for index, data_chunk4conv in enumerate(get_convovled_data(phase_data,self.convolution_indeces)):
-            res[:,index,:]=self._get_Alex_feature(data_chunk4conv, beta)
+            res[index,:]=self._get_Alex_feature(data_chunk4conv, beta)
         return res
 
 
@@ -40,7 +41,13 @@ class AlexPreprocess:
         return np.exp(-beta * norm(conv_phase_delta) ** 2)
 
 
+    def visualise_activations(self,vis_object):
+        extracted_features = self.extract_expert_features()
+        norm = matplotlib.colors.Normalize(vmin=extracted_features.min(), vmax=extracted_features.min())
 
+        for t in xrange(extracted_features.shape[1]):
+            title = 'Time %f' %t
+            vis_object._visualise_target_convolutions(self.convolution_indeces,norm(extracted_features[:,t]), title)
 
 
 
