@@ -1,14 +1,21 @@
 from mne.io import read_raw_fif
-from mne.channels import find_layout,read_ch_connectivity
+from mne.channels import read_layout, find_layout,read_ch_connectivity
 from mne.datasets import sample
 import numpy as np
 from mne.viz import plot_topomap
 import os
 import matplotlib.pyplot as plt
 import matplotlib
+from scipy.io import loadmat
+
 class Convolutions:
-    def __init__(self):
-        pass
+    def __init__(self,neighboring,topography_3D,ch_names,num_channels):
+        self.neighboring = neighboring
+        self.topography_3D = topography_3D
+        self.ch_names = ch_names
+        self.num_channels = num_channels
+        self.edges_matrix = self.calc_3D_edges_matrix()
+
 
     def calc_3D_edges_matrix(self):
         #We need only upper part of connectivity matrix
@@ -83,33 +90,47 @@ class ConvolutionNeuromag(Convolutions):
     #
     def __init__(self,sensor_type):
         # @sensor_type "mag" or "grad"
-        self.sensor_type = sensor_type
-        if (self.sensor_type == 'mag'):
-            neighboring_filename = 'neuromag306mag_neighb.mat'
-        if (self.sensor_type == 'grad'):
-            neighboring_filename = 'neuromag306planar_neighb.mat'
+        sensor_type = sensor_type
+        info_path = './neuromag_info'
+        if (sensor_type == 'mag'):
+            neighboring_filename = os.path.join(info_path,'neuromag306mag_neighb.mat')
+        if (sensor_type == 'grad'):
+            neighboring_filename = os.path.join(info_path,'neuromag306planar_neighb.mat')
         neuromag = read_raw_fif(sample.data_path() +
                           '/MEG/sample/sample_audvis_raw.fif')
-        self.topography_2D = find_layout(neuromag.info, ch_type=self.sensor_type).pos
-        self.topography_3D = np.array([ch['loc'][:3] for ch in neuromag.info['chs'] if (ch['ch_name'][-1] == '1') & (ch['ch_name'][0:3] == 'MEG')])
+        topography_2D = find_layout(neuromag.info, ch_type=self.sensor_type).pos
+        topography_3D = np.array([ch['loc'][:3] for ch in neuromag.info['chs'] if (ch['ch_name'][-1] == '1') & (ch['ch_name'][0:3] == 'MEG')])
 
-        self.neighboring,self.ch_names = read_ch_connectivity(neighboring_filename, picks=None) #ch. names written  in 'MEG1111' format
-        self.neighboring = self.neighboring.toarray()
-        self.num_channels = len(self.ch_names)
-        self.edges_matrix = self.calc_3D_edges_matrix()
+        neighboring,ch_names = read_ch_connectivity(neighboring_filename, picks=None) #ch. names written  in 'MEG1111' format
+        neighboring = self.neighboring.toarray()
+        num_channels = len(ch_names)
+        Convolutions.__init__(neighboring,topography_3D,ch_names,num_channels)
 
 class ConvolutionsGSN128(Convolutions):
     def __init__(self):
-        neighboring_filename = 'neuromag306planar_neighb.mat'
-        neuromag = read_raw_fif(sample.data_path() +
-                          '/MEG/sample/sample_audvis_raw.fif')
-        self.topography_2D = find_layout(neuromag.info, ch_type=self.sensor_type).pos
-        self.topography_3D = np.array([ch['loc'][:3] for ch in neuromag.info['chs'] if (ch['ch_name'][-1] == '1') & (ch['ch_name'][0:3] == 'MEG')])
 
-        self.neighboring,self.ch_names = read_ch_connectivity(neighboring_filename, picks=None) #ch. names written  in 'MEG1111' format
-        self.neighboring = self.neighboring.toarray()
-        self.num_channels = len(self.ch_names)
-        self.edges_matrix = self.calc_3D_edges_matrix()
+        info_path = os.path.join(os.getcwd(),'gsn128_info')
+        neighboring_filename = os.path.join(info_path,'gsn128_neighb.mat')
+        self.topography_2D = read_layout('GSN-128.lay', info_path).pos[:2]
+        num_channels,ch_names,topography_3D = self._parse_mat(os.path.join(info_path,'bs_topography.mat'))
+
+        neighboring,self.ch_names = read_ch_connectivity(neighboring_filename, picks=None)
+        neighboring = neighboring.toarray()
+        Convolutions(neighboring, topography_3D, ch_names, num_channels)
+
+    def _parse_mat(self,mat_file):
+        #This function parses topogpraphy .mat from brainstorm. It's really weird magic
+        mat = loadmat(mat_file);
+        var_name = mat.keys()[1]
+
+        num_channels = len(mat[var_name][0][0][8][0])
+        ch_names = []
+        topography_3D = np.zeros((num_channels,3))
+        for ch_ind in xrange(num_channels):
+            ch_names.append(mat[var_name][0][0][8][0][ch_ind][5][0])
+            topography_3D[ch_ind,:]= mat[var_name][0][0][8][0][ch_ind][0].T
+        return num_channels,ch_names,topography_3D
+
 
 
 #TODO rewrite this as metaclass
@@ -194,7 +215,7 @@ class VisualisationConvolutions:
         plt.close()
 
 if __name__=='__main__':
-    cn = ConvolutionNeuromag('mag')
-    convs = cn.get_1Dconvolution_channels(3)
-    cn._visualise_directions(convs)
+    cn = ConvolutionsGSN128()
+    print 'ok'
+
 
