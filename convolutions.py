@@ -5,10 +5,11 @@ import numpy as np
 from mne.viz import plot_topomap
 import os
 import matplotlib.pyplot as plt
-import matplotlib
+import matplotlib.cm
 from scipy.io import loadmat
 
 class Convolutions:
+    #TODO write method for getting service data and override it in child classes
     def __init__(self,neighboring,topography_3D,ch_names,num_channels):
         self.neighboring = neighboring
         self.topography_3D = topography_3D
@@ -71,55 +72,42 @@ class Convolutions:
         result = filter(lambda x:self.is_1D_planar(x),res)
         return result
 
-    def _visualise_convolutions(self,convs):
-        #This function used to test correctness of finded convolutions
-        test_conv = './test_conv'
-        if not os.path.isdir(test_conv):
-            os.makedirs(test_conv)
-        for conv_index, conv in enumerate(convs):
-            fake_data = np.zeros(self.num_channels)
-            fake_data[conv] = 100
-            conv_names = [self.ch_names[index] for index in conv]
-            title = '_'.join([name[3:] for name in conv_names])
-            plt.title('%s,svd ratio' % (title))
-            im,_ = plot_topomap(data=fake_data, pos=self.topography_2D,contours=0,names=self.ch_names,show=False)
-            plt.savefig(os.path.join(test_conv,title+'.png'))
-            plt.close()
-
-class ConvolutionNeuromag(Convolutions):
+class ConvolutionsNeuromag(Convolutions):
     #
-    def __init__(self,sensor_type):
+    def __init__(self,sensor_type='mag'):
         # @sensor_type "mag" or "grad"
         sensor_type = sensor_type
-        info_path = './neuromag_info'
+        code_dir = os.path.dirname(os.path.realpath(__file__))
+        info_path = os.path.join(code_dir,'neuromag_info')
         if (sensor_type == 'mag'):
             neighboring_filename = os.path.join(info_path,'neuromag306mag_neighb.mat')
         if (sensor_type == 'grad'):
             neighboring_filename = os.path.join(info_path,'neuromag306planar_neighb.mat')
         neuromag = read_raw_fif(sample.data_path() +
                           '/MEG/sample/sample_audvis_raw.fif')
-        topography_2D = find_layout(neuromag.info, ch_type=self.sensor_type).pos
+        self.topography_2D = find_layout(neuromag.info, ch_type=sensor_type).pos
         topography_3D = np.array([ch['loc'][:3] for ch in neuromag.info['chs'] if (ch['ch_name'][-1] == '1') & (ch['ch_name'][0:3] == 'MEG')])
 
         neighboring,ch_names = read_ch_connectivity(neighboring_filename, picks=None) #ch. names written  in 'MEG1111' format
-        neighboring = self.neighboring.toarray()
+        neighboring = neighboring.toarray()
         num_channels = len(ch_names)
-        Convolutions.__init__(neighboring,topography_3D,ch_names,num_channels)
+        Convolutions.__init__(self, neighboring,topography_3D,ch_names,num_channels)
 
 class ConvolutionsGSN128(Convolutions):
     def __init__(self):
-
-        info_path = os.path.join(os.getcwd(),'gsn128_info')
+        code_dir = os.path.dirname(os.path.realpath(__file__))
+        info_path = os.path.join(code_dir,'gsn128_info')
         neighboring_filename = os.path.join(info_path,'gsn128_neighb.mat')
-        self.topography_2D = read_layout('GSN-128.lay', info_path).pos[:2]
+        self.topography_2D = read_layout('GSN-128.lay', info_path).pos[:,:2]
         num_channels,ch_names,topography_3D = self._parse_mat(os.path.join(info_path,'bs_topography.mat'))
 
         neighboring,self.ch_names = read_ch_connectivity(neighboring_filename, picks=None)
         neighboring = neighboring.toarray()
-        Convolutions(neighboring, topography_3D, ch_names, num_channels)
+        Convolutions.__init__(self, neighboring, topography_3D, ch_names, num_channels)
 
     def _parse_mat(self,mat_file):
         #This function parses topogpraphy .mat from brainstorm. It's really weird magic
+        #TODO rewrite search inside imported mat file using read_ch_connectivity mne code
         mat = loadmat(mat_file);
         var_name = mat.keys()[1]
 
@@ -133,14 +121,14 @@ class ConvolutionsGSN128(Convolutions):
 
 
 
-#TODO rewrite this as metaclass
+#TODO rewrite this as child for Convolutions class
 class VisualisationConvolutions:
     def __init__(self,convolutions_object):
         self.topography_2D=convolutions_object.topography_2D
         self.ch_names = convolutions_object.ch_names
         self.num_channels = convolutions_object.num_channels
 
-    def _plot_custom_topogrpahy(self):
+    def _plot_custom_topography(self):
         plt.scatter(self.topography_2D[:,0], self.topography_2D[:,1], s=0.5)
 
     def _plot_convolution(self, sensors_indices, conv_score, radius=0.5, connect=False, draw_normal=False, plot_only_middle=False):
@@ -148,7 +136,7 @@ class VisualisationConvolutions:
         # @sensors_indices indices of channels, forming convolution
         # @conv_score - meajure of activation of convolution, have to be [0:1]
         cm = matplotlib.cm.get_cmap('inferno')
-        color = cm[conv_score]
+        color = cm(conv_score)
         conv_length = len(sensors_indices)
         is_even = lambda x: x % 2 == 0
 
@@ -156,22 +144,23 @@ class VisualisationConvolutions:
         ys = [self.topography_2D[sensor_index][1] for sensor_index in sensors_indices]
 
         if plot_only_middle:
-            plt.scatter(xs, ys, s=radius, c=color)
-        else:
             if ~is_even(conv_length):
                 plt.scatter(xs[conv_length/2], ys[conv_length/2], s=radius, c=color)
+        else:
+            plt.scatter(xs, ys, s=radius, c=color)
 
         if (connect) & ~(plot_only_middle):
             plt.plot(xs, ys, c=color)
 
-        if draw_normal & ~(plot_only_middle):
+        if draw_normal:
             vectors_xs = np.array([xs[i] - xs[i + 1] for i in range(conv_length - 1)])
             vectors_ys = np.array([ys[i] - ys[i + 1] for i in range(conv_length - 1)])
             norms = np.linalg.norm(np.vstack((vectors_xs, vectors_ys)), axis=0)
             vectors_xs /= norms
             vectors_ys /= norms
             conv_normal = np.array((sum(vectors_ys), -sum(vectors_xs)))  # Swap coordinate to get normal vector
-            conv_normal = conv_score*0.1 * conv_normal / np.linalg.norm(conv_normal)
+            eps = 0.02 #constant to make visible normals, wich close to zero
+            conv_normal = conv_score*0.05 * conv_normal + eps
 
             if ~is_even(conv_length):
                 central_node = sensors_indices[conv_length // 2]
@@ -184,7 +173,7 @@ class VisualisationConvolutions:
     def _visualise_convolution(self, convs):
         # This function draw one convolution on custom topography with direction of convolution
 
-        test_conv = './test_conv'
+        test_conv = './results/test_conv'
         if not os.path.isdir(test_conv):
             os.makedirs(test_conv)
         for conv_index, conv in enumerate(convs):
@@ -201,12 +190,11 @@ class VisualisationConvolutions:
     def _visualise_target_convolutions(self, convs,conv_scores,title):
         # This function draw all specified convolution on one custom topography with direction of convolution
         #
-
         resutls_dir = './resutls'
         if not os.path.isdir(resutls_dir):
             os.makedirs(resutls_dir)
 
-        self._plot_custom_topography(range(self.num_channels))
+        self._plot_custom_topography()
         for conv_index, conv in enumerate(convs):
             plt.title('%s,svd ratio' % (title))
             self._plot_convolution(conv, conv_scores[conv_index], radius=5, connect=False, draw_normal=True,plot_only_middle=True)
@@ -215,7 +203,10 @@ class VisualisationConvolutions:
         plt.close()
 
 if __name__=='__main__':
-    cn = ConvolutionsGSN128()
+    cn = ConvolutionsNeuromag()
+    convs = cn.get_1Dconvolution_channels(3)
+    vs = VisualisationConvolutions(cn)
+    vs._visualise_target_convolutions(convs[1:10],np.random.rand(9),'qqwerty')
     print 'ok'
 
 
