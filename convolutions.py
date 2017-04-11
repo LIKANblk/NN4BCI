@@ -7,6 +7,8 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.cm
 from scipy.io import loadmat
+from itertools import combinations
+import timeit
 
 class Convolutions:
     #TODO write method for getting service data and override it in child classes
@@ -32,22 +34,33 @@ class Convolutions:
         return edges_matrix
 
 
-    def is_1D_planar(self, convolution,threshold=0.01):
+    def is_1D_planar(self, convolution,eps=0.01):
         #@convolution - short list of channel indeceses to be convolved
         # @threshold - ration between singular values, larger wich we consider convolution 1D_planar
         #TODO improve estimation of matrix rank
         vectors_mat = np.array(self.topography_3D[convolution])
-        # _,s,_ = np.linalg.svd(vectors_mat)
-        return np.linalg.matrix_rank(vectors_mat,threshold) < 3 #TODO DEBUG threshold
+        # return np.linalg.matrix_rank(vectors_mat,threshold) < 3 #TODO DEBUG threshold
+        _,s,_ = np.linalg.svd(vectors_mat)
+        threshold = s.max()*max(vectors_mat.shape)*eps
+        return sum(s>threshold) < 3
 
     def __empirical_threshold_calculation__(self):
-        conv = ['MEG0221', 'MEG0441', 'MEG1821', 'MEG1831'] #presumably worst case for 2d head projection
+        conv = ['MEG0811', 'MEG0821', 'MEG1011'] #presumably worst case for 2d head projection
         conv_index = [self.ch_names.index(name) for name in conv]
         res = cn.is_1D_planar(conv_index)
         print res
 
     def get_1Dconvolution_channels(self,conv_length):
+        #TODO rewrite this pice of shit
         # Method for searching 1D planara subgraphs
+        def remove_duplicates(convs):
+            res = []
+            for conv in convs:
+                s_conv = sorted(conv)
+                if all(map(lambda x: sorted(x) != s_conv, res)):
+                    res.append(conv)
+            return res
+
         def recursive_search(curr_ch_index, potential_neighbors, conv_length):
             result = []
             if conv_length == 2: #TODO HACK please fix this
@@ -65,13 +78,65 @@ class Convolutions:
             return result
         res = []
         for ch_index in range(self.num_channels):
-            print ch_index
+            # print ch_index
             potential_neighbors = (range(len(self.ch_names)))
             potential_neighbors.remove(ch_index)
             res.extend(recursive_search(ch_index, potential_neighbors, conv_length))
+
         result = filter(lambda x:self.is_1D_planar(x),res)
+        result = remove_duplicates(result)
         return result
 
+
+
+    def fast_1DConvolution(self,conv_length):
+        def generate_pairs():
+            res=[]
+            for ch_y in xrange(self.num_channels):
+                for ch_x in xrange(ch_y+1,self.num_channels):
+                    if self.neighboring[ch_y][ch_x]:
+                        res.append([ch_y,ch_x])
+            return res
+
+        def union_lists(l1,l2):
+            if (l1[1:]==l2[0:-1]):
+                return l1 +[l2[-1]]
+            if (l1[0:-1] == l2[1:]):
+                return [l1[0]] + l2
+            if (l1[1:] == l2[-1:0:-1]):
+                return l1 + [l2[0]]
+            if (l1[0:-1] == l2[-2::-1]):
+                return [l2[-1]] + l1
+            return []
+
+
+        def conv_concat(convs):
+            res = []
+            for i in xrange(len(convs)):
+                for j in xrange(i+1,len(convs)):
+                    intersect_res = union_lists(convs[i],convs[j])
+                    if len(intersect_res)>0:
+                        res.append(intersect_res)
+            return res
+        convs = generate_pairs()
+        while len(convs[0]) < conv_length:
+            convs = conv_concat(convs)
+        convs = filter(lambda x: self.is_1D_planar(x), convs)
+        return convs
+
+
+
+    def get_crosses_conv(self,convs):
+        conv_length = len(convs[0])
+        res = []
+        if conv_length%2 == 1:
+            middle_vertex_ind = int(np.ceil(conv_length/2))
+            for conv_index, conv in enumerate(convs):
+                for p_c_ind,p_c in enumerate(convs):
+                    if ((p_c[middle_vertex_ind]==conv[middle_vertex_ind]) & (conv_index != p_c_ind)):
+                        neighb_mask = [self.neighboring[i,j] for i,j in combinations([middle_vertex_ind+1,middle_vertex_ind-1],2)]
+                        if reduce((lambda x,y:x&y), neighb_mask):
+                            res.append((conv,p_c))
 class ConvolutionsNeuromag(Convolutions):
     #
     def __init__(self,sensor_type='mag'):
@@ -202,11 +267,35 @@ class VisualisationConvolutions:
         plt.savefig(os.path.join(resutls_dir, title + '.png'))
         plt.close()
 
+    def visualise_convs_on_mne_topomap(self, convs):
+        # This function used to test correctness of finded convolutions
+        test_conv = './test_conv'
+        if not os.path.isdir(test_conv):
+            os.makedirs(test_conv)
+        for conv_index, conv in enumerate(convs):
+            fake_data = np.zeros(self.num_channels)
+            fake_data[conv] = 100
+            conv_names = [self.ch_names[index] for index in conv]
+            title = '_'.join([name for name in conv_names])
+            plt.title('%s' % (title))
+            im, _ = plot_topomap(data=fake_data, pos=self.topography_2D, contours=0, names=self.ch_names,
+                                 show=False)
+            plt.savefig(os.path.join(test_conv, title + '.png'))
+            plt.close()
+
+
+
+
+
+
 if __name__=='__main__':
-    cn = ConvolutionsNeuromag()
-    convs = cn.get_1Dconvolution_channels(3)
-    vs = VisualisationConvolutions(cn)
-    vs._visualise_target_convolutions(convs[1:10],np.random.rand(9),'qqwerty')
-    print 'ok'
+    cn = ConvolutionsGSN128()
+    convs_fast = cn.fast_1DConvolution(3)
+    # convs_long = cn.get_1Dconvolution_channels(3)
+
+    # cross_convs = cn.get_crosses_conv(convs)
+    # vs = VisualisationConvolutions(cn)
+    # vs.visualise_convs_on_mne_topomap(map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
+    # vs._visualise_target_convolutions(convs[1:10],np.random.rand(9),'qqwerty')
 
 
