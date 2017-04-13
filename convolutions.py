@@ -7,8 +7,8 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.cm
 from scipy.io import loadmat
-from itertools import combinations
-import timeit
+from itertools import product
+import math
 
 class Convolutions:
     #TODO write method for getting service data and override it in child classes
@@ -34,25 +34,22 @@ class Convolutions:
         return edges_matrix
 
 
-    def is_1D_planar(self, convolution,eps=0.01):
-        #@convolution - short list of channel indeceses to be convolved
-        # @threshold - ration between singular values, larger wich we consider convolution 1D_planar
-        #TODO improve estimation of matrix rank
-        vectors_mat = np.array(self.topography_3D[convolution])
-        # return np.linalg.matrix_rank(vectors_mat,threshold) < 3 #TODO DEBUG threshold
-        _,s,_ = np.linalg.svd(vectors_mat)
-        threshold = s.max()*max(vectors_mat.shape)*eps
-        return sum(s>threshold) < 3
 
-    def __empirical_threshold_calculation__(self):
-        conv = ['MEG0811', 'MEG0821', 'MEG1011'] #presumably worst case for 2d head projection
-        conv_index = [self.ch_names.index(name) for name in conv]
-        res = cn.is_1D_planar(conv_index)
-        print res
 
-    def get_1Dconvolution_channels(self,conv_length):
-        #TODO rewrite this pice of shit
-        # Method for searching 1D planara subgraphs
+    def get_1Dconvolution_old(self, conv_length):
+        # TODO rewrite this pice of shit
+        # DEPRICATED! Method for searching 1D planar subgraphs
+
+        def is_1D_planar(self, convolution, eps=0.01):
+            # @convolution - short list of channel indeceses to be convolved
+            # @threshold - ration between singular values, larger wich we consider convolution 1D_planar
+            # TODO improve estimation of matrix rank
+            vectors_mat = np.array(self.topography_3D[convolution])
+            # return np.linalg.matrix_rank(vectors_mat,threshold) < 3 #TODO DEBUG threshold
+            _, s, _ = np.linalg.svd(vectors_mat)
+            threshold = s.max() * max(vectors_mat.shape) * eps
+            return sum(s > threshold) < 3
+
         def remove_duplicates(convs):
             res = []
             for conv in convs:
@@ -63,19 +60,20 @@ class Convolutions:
 
         def recursive_search(curr_ch_index, potential_neighbors, conv_length):
             result = []
-            if conv_length == 2: #TODO HACK please fix this
+            if conv_length == 2:  # TODO HACK please fix this
                 for p_n_index in potential_neighbors:
                     if self.neighboring[curr_ch_index][p_n_index]:
                         result.append([p_n_index])
-                # return result
+                        # return result
             else:
                 for p_n_index in potential_neighbors:
                     if self.neighboring[curr_ch_index][p_n_index]:
                         new_potential_neighbors = [ch for ch in potential_neighbors if ch != p_n_index]
-                        tmp_res = recursive_search(p_n_index,new_potential_neighbors,conv_length-1)
+                        tmp_res = recursive_search(p_n_index, new_potential_neighbors, conv_length - 1)
                         result = result + tmp_res
             result = [[curr_ch_index] + elem for elem in result]
             return result
+
         res = []
         for ch_index in range(self.num_channels):
             # print ch_index
@@ -83,34 +81,51 @@ class Convolutions:
             potential_neighbors.remove(ch_index)
             res.extend(recursive_search(ch_index, potential_neighbors, conv_length))
 
-        result = filter(lambda x:self.is_1D_planar(x),res)
+        result = filter(lambda x: is_1D_planar(x), res)
         result = remove_duplicates(result)
         return result
 
 
+    def _angle_betwen_edges(self,edge1,edge2):
+        #Calculate angel between edges in graph
+        # edge  - tuple with two vertices (start of the edge end end of the edge)
+        vector1 = self.topography_3D[edge1[1]] - self.topography_3D[edge1[0]]
+        vector2 = self.topography_3D[edge2[1]] - self.topography_3D[edge2[0]]
+        return math.acos(vector1.dot(vector2)/(np.linalg.norm(vector1)*np.linalg.norm(vector2)))
 
-    def fast_1DConvolution(self,conv_length):
+    def get_1Dconvolutions(self,conv_length,thres = (math.pi/6)):
         def generate_pairs():
+            #generate pairs of neighboring channels (start for further concatenation
             res=[]
             for ch_y in xrange(self.num_channels):
                 for ch_x in xrange(ch_y+1,self.num_channels):
                     if self.neighboring[ch_y][ch_x]:
                         res.append([ch_y,ch_x])
             return res
+        def is_planar(conv):
+            # Check is conv is plannar
+            # We checking only  right most and left most pairs of convolution edges
+            #@conv - list of vertices
+            left_is_planar = (self._angle_betwen_edges((conv[0],conv[1]), (conv[1],conv[2])) <(thres))
+            right_is_planar = (self._angle_betwen_edges((conv[0], conv[1]), (conv[1], conv[2])) < (thres))
+            return left_is_planar & right_is_planar
 
         def union_lists(l1,l2):
+            #Union  lists l1 and l2 if they have apropriate intersection
+            f= lambda l: l if is_planar(l) else []
             if (l1[1:]==l2[0:-1]):
-                return l1 +[l2[-1]]
+                return f(l1 +[l2[-1]])
             if (l1[0:-1] == l2[1:]):
-                return [l1[0]] + l2
+                return f(l2 + [l1[-1]])
             if (l1[1:] == l2[-1:0:-1]):
-                return l1 + [l2[0]]
+                return f(l1 + [l2[0]])
             if (l1[0:-1] == l2[-2::-1]):
-                return [l2[-1]] + l1
+                return f([l2[-1]] + l1)
             return []
 
 
         def conv_concat(convs):
+            #Concatenate (union) neighboring convolutions
             res = []
             for i in xrange(len(convs)):
                 for j in xrange(i+1,len(convs)):
@@ -118,13 +133,32 @@ class Convolutions:
                     if len(intersect_res)>0:
                         res.append(intersect_res)
             return res
+
         convs = generate_pairs()
         while len(convs[0]) < conv_length:
             convs = conv_concat(convs)
-        convs = filter(lambda x: self.is_1D_planar(x), convs)
         return convs
 
+    def _test_convs_correctness_(self,convs):
+        #Test method for estimating corretness of array of convs
+        def remove_duplicates(convs):
+            res = []
+            for conv in convs:
+                s_conv = sorted(conv)
+                if all(map(lambda x: sorted(x) != s_conv, res)):
+                    res.append(conv)
+            return res
 
+        #search vertex duplicates inside each conv
+        conv_length = len(convs[0])
+        no_loops = all([len(set(elem))==conv_length for elem in convs])
+        if not no_loops:
+            print 'Some convolutions have duplicate vertices'
+
+        # search conv. duplicates inside convs list
+        no_duplicates = len(remove_duplicates([sorted(elem) for elem in convs])) == len(convs)
+        if not no_duplicates:
+            print 'Some convolutions met several times in convs list'
 
     def get_crosses_conv(self,convs):
         conv_length = len(convs[0])
@@ -132,11 +166,15 @@ class Convolutions:
         if conv_length%2 == 1:
             middle_vertex_ind = int(np.ceil(conv_length/2))
             for conv_index, conv in enumerate(convs):
-                for p_c_ind,p_c in enumerate(convs):
+                for p_c_ind,p_c in enumerate(convs[conv_index+1:]):
                     if ((p_c[middle_vertex_ind]==conv[middle_vertex_ind]) & (conv_index != p_c_ind)):
-                        neighb_mask = [self.neighboring[i,j] for i,j in combinations([middle_vertex_ind+1,middle_vertex_ind-1],2)]
-                        if reduce((lambda x,y:x&y), neighb_mask):
+                        neighb_mask = [self.neighboring[conv[i],p_c[j]] for i,j in product([middle_vertex_ind+1,middle_vertex_ind-1],repeat=2)]
+                        if all(neighb_mask):
                             res.append((conv,p_c))
+        return res
+
+
+
 class ConvolutionsNeuromag(Convolutions):
     #
     def __init__(self,sensor_type='mag'):
@@ -173,7 +211,7 @@ class ConvolutionsGSN128(Convolutions):
     def _parse_mat(self,mat_file):
         #This function parses topogpraphy .mat from brainstorm. It's really weird magic
         #TODO rewrite search inside imported mat file using read_ch_connectivity mne code
-        mat = loadmat(mat_file);
+        mat = loadmat(mat_file)
         var_name = mat.keys()[1]
 
         num_channels = len(mat[var_name][0][0][8][0])
@@ -290,12 +328,11 @@ class VisualisationConvolutions:
 
 if __name__=='__main__':
     cn = ConvolutionsGSN128()
-    convs_fast = cn.fast_1DConvolution(3)
-    # convs_long = cn.get_1Dconvolution_channels(3)
-
+    convs = cn.get_1Dconvolutions(5)
+    cn._test_convs_correctness_(convs)
     # cross_convs = cn.get_crosses_conv(convs)
     # vs = VisualisationConvolutions(cn)
-    # vs.visualise_convs_on_mne_topomap(map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
+    # vs.visualise_convs_on_mne_topomap(convs)#map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
     # vs._visualise_target_convolutions(convs[1:10],np.random.rand(9),'qqwerty')
 
 
