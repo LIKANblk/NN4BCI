@@ -10,6 +10,8 @@ from scipy.io import loadmat
 from itertools import product
 import math
 
+
+
 class Convolutions:
     #TODO write method for getting service data and override it in child classes
     def __init__(self,neighboring,topography_3D,ch_names,num_channels):
@@ -160,8 +162,10 @@ class Convolutions:
         if not no_duplicates:
             print 'Some convolutions met several times in convs list'
 
-    def get_crosses_conv(self,convs):
-        conv_length = len(convs[0])
+    def get_crosses_conv(self,conv_length):
+        #get cross-like convolutions
+        #@return array of tuples, where each tuple consistc of two lists, each list 1d-planar convolution
+        convs = self.get_1Dconvolutions(conv_length)
         res = []
         if conv_length%2 == 1:
             middle_vertex_ind = int(np.ceil(conv_length/2))
@@ -173,7 +177,16 @@ class Convolutions:
                             res.append((conv,p_c))
         return res
 
-
+    def get_conv_vectors(self,conv):
+        # Function for calculating tangent and normal vector of convolution
+        conv_length = len(conv)
+        xs = [self.topography_3D[sensor_index][0] for sensor_index in conv]
+        ys = [self.topography_3D[sensor_index][1] for sensor_index in conv]
+        vectors = [np.array((xs[i] - xs[i + 1],ys[i] - ys[i + 1])) for i in range(conv_length - 1)]
+        normalised_vectors = map(lambda x: x/np.linalg.norm(x),vectors)
+        tangent = sum(normalised_vectors)/np.linalg.norm(sum(normalised_vectors))
+        normal = np.array((tangent[1],-tangent[0]))
+        return tangent,normal
 
 class ConvolutionsNeuromag(Convolutions):
     #
@@ -322,17 +335,12 @@ class VisualisationConvolutions:
             plt.close()
 
 
-
-
-
-
 if __name__=='__main__':
     cn = ConvolutionsGSN128()
-    convs = cn.get_1Dconvolutions(5)
-    cn._test_convs_correctness_(convs)
-    # cross_convs = cn.get_crosses_conv(convs)
-    # vs = VisualisationConvolutions(cn)
-    # vs.visualise_convs_on_mne_topomap(convs)#map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
+    convs = cn.get_1Dconvolutions(3)
+    cross_convs = cn.get_crosses_conv(convs)
+    vs = VisualisationConvolutions(cn)
+    vs.visualise_convs_on_mne_topomap(map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
     # vs._visualise_target_convolutions(convs[1:10],np.random.rand(9),'qqwerty')
 
 

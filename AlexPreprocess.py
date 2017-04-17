@@ -2,14 +2,11 @@
 from scipy.linalg import norm
 from scipy.signal import hilbert
 from itertools import combinations
-import matplotlib
 from Data import *
 from convolutions import *
 
-
-
-def get_convovled_data(data,convolutions):
-    for conv in convolutions:
+def get_convovled_data(data,convolutions_1d):
+    for conv in convolutions_1d:
         yield data[:,conv,:]
 
 
