@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import Queue as qu
 
 # calculate 3d direction of convolution points
 # TODO: remake to process any number of points in a convolution
@@ -61,15 +62,136 @@ def make_conv_trees(v, c, N, dth, dfi):
                     result.append(poss_res)
     return result
 
+# TODO: generate Delaunay triangulation for vertices in the matrix
+
+# reorder edges to make cycle or chain (such that ed(i,2)==ed(i+1,1))
+def order_edges(edges):
+    # check is there a cycle or not (if there are any vertices 
+    # in column 1 but not 2 then it is not a cycle)
+    starts = [e[0] for e in edges]
+    ends = [e[1] for e in edges]
+    # find non-paired vertice if any
+    is_cycle = True
+    non_pair_start = -1
+    for v_st in starts:
+        if v_st not in ends:
+            is_cycle = False
+            non_pair_start = v_st
+            break
+    if is_cycle:
+        non_pair_start = min(starts)
+    # now non_pair_start will be starting point for processing
+    ordered_edges = []
+    curr_v = non_pair_start
+    has_next = True
+    while has_next: # process all edges
+        try:
+            curr_ind = starts.index(curr_v)
+            has_next = True
+            ordered_edges.append((curr_v, ends[curr_ind]))
+            curr_v = ends[curr_ind]
+            del starts[curr_ind]
+            del ends[curr_ind]
+        except ValueError:
+            has_next = False
+    # if any vertex are in starts when processing finishes,
+    # the surface is not manifold in start point
+    assert(starts == [])
+    return ordered_edges
+        
+assert(order_edges([[3,4],[1,3],[4,5]])==[(1,3),(3,4),(4,5)])
+assert(order_edges([[3,4],[1,3],[4,1]])==[(1,3),(3,4),(4,1)])
+
+# initialize search queue if the starting point is vertex
+def initialize_queue_by_vertex(v, f, init_v, target_v):
+    # get all triangles where init_v is first, second or third vertex,
+    # and separate one vertex
+    edges = [(curr_f[1], curr_f[2]) for curr_f in f if curr_f[0]==init_v]
+    edges.extend([(curr_f[2], curr_f[0]) for curr_f in f if curr_f[1]==init_v])
+    edges.extend([(curr_f[0], curr_f[1]) for curr_f in f if curr_f[2]==init_v])
+    if edges==[]:
+        return [] # can not process a separate vertex
+    # sort edges to make chain or cycle (if possible)
+    edges = order_edges(edges)
+    # set angles and possible positions starting from 
+    # the first point in sorted list
+    curr_angle = 0
+    # format of variants in queue:
+    # (target_dist, [v1 v2 v1_flat(x,y) v2_flat(x,y) angle_start_flat(x,y) angle_end_flat(x,y), edge_stack])
+    variants = qu.PriorityQueue()
+    for (first_v, second_v) in edges:
+        # calculate flat coordinates for two triangle vertices
+        v_i1 = v[first_v]-v[init_v]
+        v_i2 = v[second_v]-v[init_v]        
+        len1 = np.linalg.norm(v_i1)
+        len2 = np.linalg.norm(v_i2)
+        # calculate angle between 0-v1 and 0-v2
+        ort1 = v_i1/len1
+        ort2 = v_i2/len2
+        angle_12 = math.acos(np.dot(ort1,ort2))
+        # calculate flat coordinates of each vertex processed
+        v1_flat = np.array([len1*math.cos(curr_angle), len1*math.sin(curr_angle)])
+        curr_angle += angle_12
+        v2_flat = np.array([len2*math.cos(curr_angle), len2*math.sin(curr_angle)])
+        # calculate measure of distance from v1-v2 to target
+        dist = np.linalg.norm((v[first_v]+v[second_v])/2 - v[target_v])
+        variants.put((dist, [first_v, second_v, v1_flat, v2_flat, v1_flat, v2_flat, [[first_v, second_v]]]))
+    return variants
+
+# one step in depth for dfs
+# variants: priority queue of (target_dist, [v1 v2 v1_flat(x,y) v2_flat(x,y) angle_start_flat(x,y) angle_end_flat(x,y) stack])
+# init_vertex,target_vertex: positions
+# return: (False, new_variants, []) or (True, [], answer)
+def dfs_step(v, f, variants, init_vertex, target_vertex):
+    # if there are no any more variants, return 0
+    if variants.empty():
+        return (False, variants, [])
+    # get top element
+    next_data = variants.get()
+    v1 = next_data[1][0]
+    v2 = next_data[1][1]
+    v1_flat = next_data[1][2]
+    v2_flat = next_data[1][3]
+    a1_flat = next_data[1][4]
+    a2_flat = next_data[1][5]
+    old_stack = next_data[1][6]
+    # check if the target is achieved; if yes, return result
+    if v1==target_vertex or v2==target_vertex:
+        return (True, [], old_stack)
+    # if the target is not achieved yet, expang two edges
+    # 0. Find new vertex in f
+    found_v = [c_f[2] for c_f in f if c_f[0]==v2 and c_f[1]==v1]
+    found_v.extend([c_f[0] for c_f in f if c_f[1]==v2 and c_f[2]==v1])
+    found_v.extend([c_f[1] for c_f in f if c_f[2]==v2 and c_f[0]==v1])
+    if found_v==[]: # there is no such a face
+        return (False, variants, []) # variants are changed by get already
+    assert(len(found_v)==1) # else the surface is non-manifold
+    v3 = found_v[0]    
+    # 1. Calculate the new vertex position
+#    l13 = np.linalg.norm(v[v3] - v[v1])
+#    angle_213 = 
+    # TODO: continue
+    return (False, variants, [])
+
 # tests
+
 # create test array of convolutions (simplest form)
 def gen_test_array(N):
+    # vertices
     xc = np.repeat(np.arange(1,N+1),N)
     yc = np.reshape(np.repeat(np.asmatrix(np.arange(1,N+1)), N, 0), (1, N*N))
-    return np.column_stack([xc, np.asarray(yc)[0], np.repeat([0], N*N)])
+    vs = np.column_stack([xc, np.asarray(yc)[0], np.repeat([0], N*N)])
+    # faces: temporary manual generation instead of Delaunay generation
+    start_v = [i*N+j for j in range(0,N-1) for i in range(0,N-1)]
+    fs = [[v, v+1, v+1+N] for v in start_v] 
+    fs.extend([[v, v+1+N, v+N] for v in start_v])
+    return (vs, fs)
 
 test_N = 4
-test_v = gen_test_array(test_N)
+(test_v, test_fs) = gen_test_array(test_N)
+init_vars = initialize_queue_by_vertex(test_v, test_fs, 1, 14)
+dfs_step(test_v, test_fs, init_vars, 1, 14)
+
 test_convs = np.array([[0,1,2], [4,5,6], [9,10,11], [12,13,14], [3,7,11], [7,14,15]])
 res_seq = make_conv_trees(test_v, test_convs, 3, 0.1, 0.1)
 assert(res_seq==[[0,1,3]])
