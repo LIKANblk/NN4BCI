@@ -8,12 +8,6 @@ class Data:
     def __init__(self,path_to_data):
         self.path_to_data = path_to_data
 
-
-    def get_all_data(self):
-        #Loads ALL data from ALL folders for ALL classes
-        print 'Not implemented'
-        pass
-
     def load_from_spec_folder(self,path_to_folder):
         #Process all .mat files in specified folder
         return np.concatenate(
