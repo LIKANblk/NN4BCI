@@ -45,8 +45,8 @@ class CrossFeatures:
 if __name__ == '__main__':
     convolutions_object = ConvolutionsNeuromag()
     cf = CrossFeatures(convolutions_object)
-    synth_data = NeuromagData('mag')
-    data = synth_data.get_data_by_label('em01',synth_data.get_data_labels()[0])
+    data = NeuromagData('mag')
+    data = data.get_data_by_label('em01',data.get_data_labels()[0])
     features = cf.extract_expert_features(data,conv_length=3)
     print features.shape
 

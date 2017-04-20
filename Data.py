@@ -19,6 +19,7 @@ class Data:
         return (data['F'])[np.newaxis, ...].astype('float32',
                         casting='same_kind')  # additional dimension for easier concatenation to 3d array in the future
 
+
 class GSN128Data(Data):
     def __init__(self):
         Data.__init__(self,path_to_data = 'DATA/GSN128/')
