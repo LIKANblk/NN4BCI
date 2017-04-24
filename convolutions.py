@@ -9,16 +9,18 @@ import matplotlib.cm
 from scipy.io import loadmat
 from itertools import product
 import math
+from devices import *
 
 
 
 class Convolutions:
     #TODO write method for getting service data and override it in child classes
-    def __init__(self,neighboring,topography_3D,ch_names,num_channels):
-        self.neighboring = neighboring
-        self.topography_3D = topography_3D
-        self.ch_names = ch_names
-        self.num_channels = num_channels
+    def __init__(self,device):
+        self.neighboring = device.neighboring
+        self.topography_2D = device.topography_2D
+        self.topography_3D = device.topography_3D
+        self.ch_names = device.ch_names
+        self.num_channels = device.num_channels
         self.edges_matrix = self.calc_3D_edges_matrix()
 
 
@@ -188,54 +190,19 @@ class Convolutions:
         normal = np.array((tangent[1],-tangent[0]))
         return tangent,normal
 
-class ConvolutionsNeuromag(Convolutions):
-    #
-    def __init__(self,sensor_type='mag'):
-        # @sensor_type "mag" or "grad"
-        sensor_type = sensor_type
-        code_dir = os.path.dirname(os.path.realpath(__file__))
-        info_path = os.path.join(code_dir,'neuromag_info')
-        if (sensor_type == 'mag'):
-            neighboring_filename = os.path.join(info_path,'neuromag306mag_neighb.mat')
-        if (sensor_type == 'grad'):
-            neighboring_filename = os.path.join(info_path,'neuromag306planar_neighb.mat')
-        neuromag = read_raw_fif(sample.data_path() +
-                          '/MEG/sample/sample_audvis_raw.fif')
-        self.topography_2D = find_layout(neuromag.info, ch_type=sensor_type).pos
-        topography_3D = np.array([ch['loc'][:3] for ch in neuromag.info['chs'] if (ch['ch_name'][-1] == '1') & (ch['ch_name'][0:3] == 'MEG')])
-
-        neighboring,ch_names = read_ch_connectivity(neighboring_filename, picks=None) #ch. names written  in 'MEG1111' format
-        neighboring = neighboring.toarray()
-        num_channels = len(ch_names)
-        Convolutions.__init__(self, neighboring,topography_3D,ch_names,num_channels)
-
-class ConvolutionsGSN128(Convolutions):
-    def __init__(self):
-        code_dir = os.path.dirname(os.path.realpath(__file__))
-        info_path = os.path.join(code_dir,'gsn128_info')
-        neighboring_filename = os.path.join(info_path,'gsn128_neighb.mat')
-        self.topography_2D = read_layout('GSN-128.lay', info_path).pos[:,:2]
-        num_channels,ch_names,topography_3D = self._parse_mat(os.path.join(info_path,'bs_topography.mat'))
-
-        neighboring,self.ch_names = read_ch_connectivity(neighboring_filename, picks=None)
-        neighboring = neighboring.toarray()
-        Convolutions.__init__(self, neighboring, topography_3D, ch_names, num_channels)
-
-    def _parse_mat(self,mat_file):
-        #This function parses topogpraphy .mat from brainstorm. It's really weird magic
-        #TODO rewrite search inside imported mat file using read_ch_connectivity mne code
-        mat = loadmat(mat_file)
-        var_name = mat.keys()[1]
-
-        num_channels = len(mat[var_name][0][0][8][0])
-        ch_names = []
-        topography_3D = np.zeros((num_channels,3))
-        for ch_ind in xrange(num_channels):
-            ch_names.append(mat[var_name][0][0][8][0][ch_ind][5][0])
-            topography_3D[ch_ind,:]= mat[var_name][0][0][8][0][ch_ind][0].T
-        return num_channels,ch_names,topography_3D
-
-
+# class ConvolutionsNeuromag(Convolutions):
+#     #
+#     def __init__(self,sensor_type='mag'):
+#         # @sensor_type "mag" or "grad"
+#         dev = Neuromag(sensor_type)
+#         self.topography_2D = dev.topography_2D
+#         Convolutions.__init__(self,dev.neighboring,dev.topography_3D,dev.ch_names,dev.num_channels)
+#
+# class ConvolutionsGSN128(Convolutions):
+#     def __init__(self):
+#         dev = GSN128()
+#         self.topography_2D = dev.topography_2D
+#         Convolutions.__init__(self, dev.neighboring, dev.topography_3D, dev.ch_names, dev.num_channels)
 
 #TODO rewrite this as child for Convolutions class
 class VisualisationConvolutions:
@@ -336,11 +303,13 @@ class VisualisationConvolutions:
 
 
 if __name__=='__main__':
-    cn = ConvolutionsGSN128()
-    convs = cn.get_1Dconvolutions(3)
-    cross_convs = cn.get_crosses_conv(convs)
+    dev = GSN128()
+    cn = Convolutions(dev)
     vs = VisualisationConvolutions(cn)
-    vs.visualise_convs_on_mne_topomap(map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
-    # vs._visualise_target_convolutions(convs[1:10],np.random.rand(9),'qqwerty')
+    convs = cn.get_1Dconvolutions(4)
+    vs.visualise_convs_on_mne_topomap(convs)
+
+    # cross_convs = cn.get_crosses_conv(convs)
+    # vs.visualise_convs_on_mne_topomap(map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
 
 
