@@ -1,12 +1,6 @@
-from mne.io import read_raw_fif
-from mne.channels import read_layout, find_layout,read_ch_connectivity
-from mne.datasets import sample
-import numpy as np
 from mne.viz import plot_topomap
-import os
 import matplotlib.pyplot as plt
 import matplotlib.cm
-from scipy.io import loadmat
 from itertools import product
 import math
 from devices import *
@@ -190,19 +184,6 @@ class Convolutions:
         normal = np.array((tangent[1],-tangent[0]))
         return tangent,normal
 
-# class ConvolutionsNeuromag(Convolutions):
-#     #
-#     def __init__(self,sensor_type='mag'):
-#         # @sensor_type "mag" or "grad"
-#         dev = Neuromag(sensor_type)
-#         self.topography_2D = dev.topography_2D
-#         Convolutions.__init__(self,dev.neighboring,dev.topography_3D,dev.ch_names,dev.num_channels)
-#
-# class ConvolutionsGSN128(Convolutions):
-#     def __init__(self):
-#         dev = GSN128()
-#         self.topography_2D = dev.topography_2D
-#         Convolutions.__init__(self, dev.neighboring, dev.topography_3D, dev.ch_names, dev.num_channels)
 
 #TODO rewrite this as child for Convolutions class
 class VisualisationConvolutions:

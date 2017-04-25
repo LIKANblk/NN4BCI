@@ -14,7 +14,7 @@ class Device(object):
         self.num_channels = num_channels
 
 class Neuromag(Device):
-    def __init__(self,sensor_type):
+    def __init__(self,sensor_type = 'mag'):
         # sensor_type - mag or grad. Grad not yet implemented
 
         code_dir = os.path.dirname(os.path.realpath(__file__))

@@ -1,6 +1,6 @@
 from scipy.io import loadmat
 import os
-
+from devices import *
 import numpy as np
 
 
@@ -71,7 +71,7 @@ class NeuromagData(Data):
         return filter(is_dir, os.listdir(os.path.join(self.path_to_data,experiment_name)))
 
 
-    def get_all_data(self,experiment,target_dim_order):
+    def get_all_data(self,experiment,target_dim_order=['trial', 'channel', 'time']):
         # @dim_order - list of strings in format ['trial','channel','time']
         labels = self.get_data_labels()
 
@@ -105,4 +105,41 @@ class NeuromagData(Data):
         is_dir = lambda filename: os.path.isdir(os.path.join(self.path_to_data, filename))
         return filter(is_dir, os.listdir(self.path_to_data))
 
+class DataAugmentation:
+    def __init__(self,device):
+        self.device = device
 
+    def mirror_sensors(self,data):
+        def find_symmetric():
+            channels = range(len(self.device.ch_names))
+            topography_3D = self.device.topography_3D
+            left, right = [], []
+            for ch in channels:
+                if topography_3D[ch, 0] < 0:
+                    left.append(ch)
+                if topography_3D[ch, 0] > 0:
+                    right.append(ch)
+            res = []
+            for l in left:
+                tmp = [[l, r] for r in right]
+                key_func = lambda pair: np.linalg.norm(topography_3D[pair[0]][1:] - topography_3D[pair[1]][1:])
+                sym_pair = min(tmp, key=key_func)
+                #         print cn.ch_names[sym_pair[0]],cn.ch_names[sym_pair[1]]
+                right.remove(sym_pair[1])
+                res.append(sym_pair)
+            return res
+        ch_dim = data.shape.index(self.device.num_channels)
+        res = np.array(data)
+        pairs = find_symmetric()
+        for pair in pairs:
+            source_indices = [slice(None)]*ch_dim + [pair] + [slice(None)]*(data.ndim-ch_dim-1)
+            res_indices = [slice(None)]*ch_dim + [pair[::-1]] + [slice(None)]*(data.ndim-ch_dim-1)
+            res[res_indices] = res[source_indices]
+        return res
+
+if __name__ == '__main__':
+    dev = Neuromag('mag')
+    data_source = NeuromagData('mag')
+    data,label = data_source.get_all_data('em01',target_dim_order = ['trial','time','channel'])
+    augmenter = DataAugmentation(device=dev)
+    mirrored_data = augmenter.mirror_sensors(data)

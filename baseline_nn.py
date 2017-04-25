@@ -11,12 +11,12 @@ def get_base_model(input_len, fsize,channel_number):
     '''
     input_seq = Input(shape=(input_len, channel_number))
     nb_filters = 200
-    convolved = Convolution1D(nb_filters, fsize, border_mode="same", activation="tanh")(input_seq)
+    convolved = Convolution1D(nb_filters, fsize, border_mode="same", activation="relu")(input_seq)
     pooled = GlobalMaxPooling1D()(convolved)
     compressed = Dense(250, activation="linear")(pooled)
-    compressed = Dropout(0.3)(compressed)
+    compressed = Dropout(0.1)(compressed)
     compressed = Dense(250, activation="relu")(compressed)
-    compressed = Dropout(0.3)(compressed)
+    compressed = Dropout(0.1)(compressed)
     model = Model(input=input_seq, output=compressed)
     return model
 
@@ -38,7 +38,7 @@ def get_full_model(channel_number):
 
     model = Model(input=[input256_seq, input500_seq, input1125_seq], output=out)
 
-    opt = RMSprop(lr=0.000005, clipvalue=10**6)
+    opt = RMSprop(lr=0.00005, clipvalue=10**6)
     model.compile(loss='categorical_crossentropy',metrics=['accuracy'], optimizer=opt)
     return model
 
@@ -52,15 +52,18 @@ def get_resampled_data(data,axis):
     return [resample(data,256,axis=axis),resample(data,500,axis=axis),data]
 if __name__=='__main__':
     experiment='em02'
-    data = NeuromagData('mag')
+    data_source = NeuromagData('mag')
     dim_order = ['trial','time','channel']
-    X,y=data.get_all_data(experiment,dim_order)
-
-
+    X,y=data_source.get_all_data(experiment,dim_order)
+    dev = Neuromag('mag')
+    augmenter = DataAugmentation(device=dev)
+    Xm = augmenter.mirror_sensors(X)
+    X = np.concatenate((X,Xm),axis=0)
+    y = np.hstack((y,y))
     model = get_full_model(X.shape[2])
     nb_epoch = 1000
     earlyStopping = EarlyStopping(monitor='val_loss', patience=10000, verbose=0, mode='auto')
 
     with K.tf.device('/gpu:2'):
-        model.fit(x=get_resampled_data(X,1),y=to_onehot(y),batch_size=300, nb_epoch = nb_epoch,
-                            callbacks=[earlyStopping], verbose=1, validation_split=0.2)
+        model.fit(x=get_resampled_data(X,1),y=to_onehot(y),batch_size=100, nb_epoch = nb_epoch,
+                            callbacks=[earlyStopping], verbose=1, validation_split=0.2,shuffle=True)
