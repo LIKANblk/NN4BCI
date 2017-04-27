@@ -1,7 +1,11 @@
 import math
 import numpy as np
 import Queue as qu
-import copy
+
+if __name__=='__main__':
+    import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
 
 # calculate 3d direction of convolution points
 # TODO: remake to process any number of points in a convolution
@@ -103,6 +107,14 @@ def order_edges(edges):
 assert(order_edges([[3,4],[1,3],[4,5]])==[(1,3),(3,4),(4,5)])
 assert(order_edges([[3,4],[1,3],[4,1]])==[(1,3),(3,4),(4,1)])
 
+# class for entry in priority queue to compare entries by key only
+class PQEntry:
+    def __init__(self, priority, value):
+        self.priority = priority
+        self.value = value
+    def __cmp__(self, other):
+         return cmp(self.priority, other.priority)
+
 # initialize search queue if the starting point is vertex
 def initialize_queue_by_vertex(v, f, init_v, target_v):
     # get all triangles where init_v is first, second or third vertex,
@@ -137,9 +149,11 @@ def initialize_queue_by_vertex(v, f, init_v, target_v):
         # calculate measure of distance from v1-v2 to target
         dist = np.linalg.norm((v[first_v]+v[second_v])/2 - v[target_v])
 #        dist = np.linalg.norm(v[target_v]-v[init_v], v[first_v]+v[second_v])/2 - v[init_v])
-        variants.put((dist, [first_v, second_v, v1_flat, v2_flat, v1_flat, v2_flat, [[first_v, second_v]]]))
+        variants.put(PQEntry(dist, [first_v, second_v, v1_flat, v2_flat, v1_flat, v2_flat, [[first_v, second_v, v1_flat, v2_flat]]]))
     return variants
 
+# calculate angle between vectors v and base_v
+# to use base_v as fixed base direction
 def rel_angle(v, base_v):
     len_b = np.linalg.norm(base_v)
     len_v = np.linalg.norm(v)
@@ -148,10 +162,11 @@ def rel_angle(v, base_v):
 assert(math.fabs(rel_angle(np.array([1,1]), np.array([2,2])))<1e-8)
 assert(math.fabs(rel_angle(np.array([1,1]), np.array([0,1]))+math.pi/4)<1e-8)
 
+# test only function: print main part of priority queue info
 def print_queue(q):
     lst = []
     for i in q.queue:
-        lst.append((round(i[0], 2),i[1][0],i[1][1], i[1][4], i[1][5]))
+        lst.append((round(i.priority, 2),i.value[0],i.value[1], i.value[4], i.value[5]))
     lst.sort(key=lambda v: v[0])
     for item in lst:
         print(item)
@@ -168,13 +183,13 @@ def dfs_step(v, f, variants, init_vertex, target_vertex, step_num):
         return (False, variants, [])
     # get top element
     next_data = variants.get()
-    v1 = next_data[1][0]
-    v2 = next_data[1][1]
-    v1_flat = next_data[1][2]
-    v2_flat = next_data[1][3]
-    a1_flat = next_data[1][4]
-    a2_flat = next_data[1][5]
-    old_stack = next_data[1][6]
+    v1 = next_data.value[0]
+    v2 = next_data.value[1]
+    v1_flat = next_data.value[2]
+    v2_flat = next_data.value[3]
+    a1_flat = next_data.value[4]
+    a2_flat = next_data.value[5]
+    old_stack = next_data.value[6]
     # check if the target is achieved; if yes, return result
     if v1==target_vertex or v2==target_vertex:
         # if the target point is in angle
@@ -213,12 +228,6 @@ def dfs_step(v, f, variants, init_vertex, target_vertex, step_num):
     old_angle2 = rel_angle(a2_flat,v3_flat)
     anglev1 = rel_angle(v1_flat,v3_flat)
     anglev2 = rel_angle(v2_flat,v3_flat)
-#    if step_num==10:
-#        print('---------Data---------')
-#        print(v1,v2,v3)
-#        print(a1_flat, a2_flat, v1_flat, v2_flat, v3_flat)
-#        print(old_angle1, old_angle2, anglev1, anglev2, anglev3)
-#        print(v1_flat[0]*v3_flat[1]-v1_flat[1]*v3_flat[0])
     # add edge 13 if it is possible
     if (v1_flat[0]*v3_flat[1]-v1_flat[1]*v3_flat[0] < -eps
         and anglev3<old_angle1 and anglev1>old_angle2):
@@ -230,11 +239,10 @@ def dfs_step(v, f, variants, init_vertex, target_vertex, step_num):
         angle_list.sort(key = lambda val: val[0]) # new angles are in angle_list[2][1] and [1][1]
         target_dist_13 = np.linalg.norm((v[v1]+v[v3])/2 - v[target_vertex])
         stack_13 = old_stack[:]
-        stack_13.append([v1,v3])
-        variants.put((target_dist_13, [v1, v3, 
-                                       v1_flat, v3_flat, 
-                                       angle_list[2][1], angle_list[1][1], 
-                                       stack_13]))
+        stack_13.append([v1,v3,v1_flat,v3_flat])
+        variants.put(PQEntry(target_dist_13,
+                             [v1, v3, v1_flat, v3_flat, 
+                              angle_list[2][1], angle_list[1][1], stack_13]))
     # add edge 32 if it is possible
     if (v3_flat[0]*v2_flat[1]-v3_flat[1]*v2_flat[0]<-eps
         and anglev2<old_angle1 and anglev3>old_angle2):
@@ -245,22 +253,103 @@ def dfs_step(v, f, variants, init_vertex, target_vertex, step_num):
                       (anglev2, v2_flat)]
         angle_list.sort(key = lambda val: val[0]) # new angles are in angle_list[2][1] and [1][1]
         target_dist_32 = np.linalg.norm((v[v2]+v[v3])/2 - v[target_vertex])
-        #print('DISTS: ',v2, v3, (v[v2]+v[v3])/2, v[target_vertex], target_dist_32)
         stack_32 = old_stack[:]
-        stack_32.append([v3,v2])
-        variants.put((target_dist_32, [v3, v2,
-                                       v3_flat, v2_flat,
-                                       angle_list[2][1], angle_list[1][1], 
-                                       stack_32]))
+        stack_32.append([v3,v2,v3_flat,v2_flat])
+        variants.put(PQEntry(target_dist_32,
+                             [v3, v2, v3_flat, v2_flat,
+                              angle_list[2][1], angle_list[1][1], stack_32]))
     return (False, variants, [])
 
+# apply depth-first search (dfs_step) to calculate path
+def find_path(v,f,init_vertex,target_vertex):
+    variants = initialize_queue_by_vertex(test_v, test_fs, start_v, end_v)
+    res = False
+    i=0
+    while res==False and not variants.empty():
+        [res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v,i)
+        i+=1
+    return (res,answ)
+
+# get 3D coordinates of path vertices
+def trace_path(v, f, init_vertex, target_vertex, path):
+    eps = 1e-6
+    assert(path!=[])
+    # get flat coordinates of the target vertex
+    target_f = None
+    if path[-1][0]==target_vertex:
+        target_f = path[-1][2]
+    elif path[-1][1]==target_vertex:
+        target_f = path[-1][3]
+    else:
+        raise ValueError # target is not in last element of the path
+    # trace through the path
+    dir_f = target_f/np.linalg.norm(target_f)
+    curr_point = v[init_vertex]
+    trace = [curr_point]
+    for ed in path:
+        # find flat crossing point of edge and line
+        v1_f = ed[2]
+        v2_f = ed[3]
+        e12 = v2_f-v1_f
+        e12 = e12/np.linalg.norm(e12)
+        # if edge and line are parallel, add edge to the result 
+        if math.fabs(dir_f[0]*e12[1] - dir_f[1]*e12[0])<eps:
+            if np.linalg.norm(v[ed[0]]-curr_point)<eps:
+                curr_point = v[ed[1]]
+                trace.append(curr_point)
+            elif np.linalg.norm(v[ed[1]]-curr_point)<eps:
+                curr_point = v[ed[0]]
+                trace.append(curr_point)
+            else:
+                raise ValueError # impossible combination?
+        else:
+            # find crossing point of edge and line
+            D = (v1_f[0]-v2_f[0])*dir_f[1] - (v1_f[1]-v2_f[1])*dir_f[0]
+            Dx = v1_f[0]*dir_f[1] - v1_f[1]*dir_f[0]
+            alpha = Dx/D
+            curr_point = (1-alpha)*v[ed[0]]+alpha*v[ed[1]]
+            trace.append(curr_point)
+    return trace
+
+# plot tracing results using matplotlib
+def plot_results(v,f,trace):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    # plot grid
+    edge_set = set()
+    for face in f: # sort edges
+        if face[0]>face[1]:
+            edge_set.add((face[1], face[0]))
+        else:
+            edge_set.add((face[0], face[1]))
+        if face[0]>face[2]:
+            edge_set.add((face[2], face[0]))
+        else:
+            edge_set.add((face[0], face[2]))
+        if face[2]>face[1]:
+            edge_set.add((face[1], face[2]))
+        else:
+            edge_set.add((face[2], face[1]))
+    for ed in edge_set: # plot edges
+        ax.plot([v[ed[0]][0], v[ed[1]][0]],
+                [v[ed[0]][1], v[ed[1]][1]],
+                zs = [v[ed[0]][2], v[ed[1]][2]], color='b')
+    # plot trace
+    for i in range(len(trace)-1):
+        c = 'r'
+        if i % 2==0:
+            c = 'g'
+        ax.plot([trace[i][0], trace[i+1][0]],
+                [trace[i][1], trace[i+1][1]],
+                zs = [trace[i][2], trace[i+1][2]], color = c)
+    plt.show()
 # tests
 
-# create test array of convolutions (simplest form)
+# create test array of points and faces (the simplest form, flat triangles)
 def gen_test_array(N):
     # vertices
-    xc = np.repeat(np.arange(1.0,float(N+1)),N)
-    yc = np.reshape(np.repeat(np.asmatrix(np.arange(1.0,float(N+1))), N, 0), (1, N*N))
+    xc = np.repeat(np.arange(1.0+10,float(N+1)+10),N)
+    yc = np.reshape(np.repeat(np.asmatrix(np.arange(1.0+10,float(N+1)+10)), N, 0), (1, N*N))
     vs = np.column_stack([xc, np.asarray(yc)[0], np.repeat([0], N*N)])
     # faces: temporary manual generation instead of Delaunay generation
     start_v = [i*N+j for j in range(0,N-1) for i in range(0,N-1)]
@@ -268,22 +357,37 @@ def gen_test_array(N):
     fs.extend([[v, v+1+N, v+N] for v in start_v])
     return (vs, fs)
 
-test_N = 8
-start_v = 15
-end_v = 40
-(test_v, test_fs) = gen_test_array(test_N)
-variants = initialize_queue_by_vertex(test_v, test_fs, start_v, end_v)
-res = False
-i=0
-while res==False and not variants.empty():
-#for i in range(50):
-    [res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v,i)
-    #print('-------'+str(i)+'-------')
-    #print_queue(variants)
-    i+=1
-print(answ)
+# create test array of points and faces (more sophisticated 3d surface)
+def gen_test_3d_array(N):
+    # vertices
+    xc = np.repeat(np.arange(1.0+10,float(N+1)+10),N)
+    yc = np.reshape(np.repeat(np.asmatrix(np.arange(1.0+10,float(N+1)+10)), N, 0), (1, N*N))
+    yc = np.asarray(yc)[0]
+    zc1 = np.exp(-xc + N/2)*1000
+    zc2 = np.exp(-yc + N/2)*1000
+    vs = np.column_stack([xc, yc, zc1+zc2])
+    # faces: temporary manual generation instead of Delaunay generation
+    start_v = [i*N+j for j in range(0,N-1) for i in range(0,N-1)]
+    fs = [[v, v+1, v+1+N] for v in start_v] 
+    fs.extend([[v, v+1+N, v+N] for v in start_v])
+    return (vs, fs)
 
-(test_v, test_fs) = gen_test_array(4)
-test_convs = np.array([[0,1,2], [4,5,6], [9,10,11], [12,13,14], [3,7,11], [7,14,15]])
-res_seq = make_conv_trees(test_v, test_convs, 3, 0.1, 0.1)
-assert(res_seq==[[0,1,3]])
+if __name__=='__main__':
+    # generate test surface for tracing
+    test_N = 8
+    start_v = 7
+    end_v = 56
+    (test_v, test_fs) = gen_test_3d_array(test_N)
+    # find path and trace it if found
+    (result, path) = find_path(test_v,test_fs,start_v,end_v)
+    if result:
+        trace_seq = trace_path(test_v, test_fs, start_v, end_v, path)
+        plot_results(test_v,test_fs,trace_seq)
+    else:
+        print('Path not found')
+    # generate test surface for convolutions pairing
+    (test_v, test_fs) = gen_test_array(4)
+    test_convs = np.array([[0,1,2], [4,5,6], [9,10,11], [12,13,14], [3,7,11], [7,14,15]])
+    # calculate pairs with the simplest algorithm (no surface paths)
+    res_seq = make_conv_trees(test_v, test_convs, 3, 0.1, 0.1)
+    assert(res_seq==[[0,1,3]])
