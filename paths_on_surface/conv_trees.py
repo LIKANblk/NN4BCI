@@ -136,7 +136,8 @@ def initialize_queue_by_vertex(v, f, init_v, target_v):
         v2_flat = np.array([len2*math.cos(curr_angle), len2*math.sin(curr_angle)])
         # calculate measure of distance from v1-v2 to target
         dist = np.linalg.norm((v[first_v]+v[second_v])/2 - v[target_v])
-        variants.put((dist, [first_v, second_v, v1_flat, v2_flat, v1_flat, v2_flat, [[first_v, second_v, v1_flat, v2_flat]]]))
+#        dist = np.linalg.norm(v[target_v]-v[init_v], v[first_v]+v[second_v])/2 - v[init_v])
+        variants.put((dist, [first_v, second_v, v1_flat, v2_flat, v1_flat, v2_flat, [[first_v, second_v]]]))
     return variants
 
 def rel_angle(v, base_v):
@@ -150,16 +151,17 @@ assert(math.fabs(rel_angle(np.array([1,1]), np.array([0,1]))+math.pi/4)<1e-8)
 def print_queue(q):
     lst = []
     for i in q.queue:
-        lst.append((i[0],i[1][0],i[1][1]))
+        lst.append((round(i[0], 2),i[1][0],i[1][1], i[1][4], i[1][5]))
     lst.sort(key=lambda v: v[0])
-    print(lst)
+    for item in lst:
+        print(item)
 
 # one step in depth for dfs
 # variants: priority queue of 
 #   (target_dist, [v1 v2 v1_flat(x,y) v2_flat(x,y) angle_start_flat(x,y) angle_end_flat(x,y) stack])
 # init_vertex,target_vertex: positions
 # return: (False, new_variants, []) or (True, [], answer)
-def dfs_step(v, f, variants, init_vertex, target_vertex):
+def dfs_step(v, f, variants, init_vertex, target_vertex, step_num):
     eps = 1e-6
     # if there are no any more variants, return 0
     if variants.empty():
@@ -181,7 +183,7 @@ def dfs_step(v, f, variants, init_vertex, target_vertex):
             result_flat = v2_flat
         cross1 = a1_flat[0]*result_flat[1]-a1_flat[1]*result_flat[0]
         cross2 = a2_flat[1]*result_flat[0]-a2_flat[0]*result_flat[1]
-        if cross1>=-eps and cross2>=-eps:
+        if cross1<=eps and cross2<=eps:
             return (True, [], old_stack)
         else:
             return (False, variants, [])
@@ -211,8 +213,15 @@ def dfs_step(v, f, variants, init_vertex, target_vertex):
     old_angle2 = rel_angle(a2_flat,v3_flat)
     anglev1 = rel_angle(v1_flat,v3_flat)
     anglev2 = rel_angle(v2_flat,v3_flat)
+#    if step_num==10:
+#        print('---------Data---------')
+#        print(v1,v2,v3)
+#        print(a1_flat, a2_flat, v1_flat, v2_flat, v3_flat)
+#        print(old_angle1, old_angle2, anglev1, anglev2, anglev3)
+#        print(v1_flat[0]*v3_flat[1]-v1_flat[1]*v3_flat[0])
     # add edge 13 if it is possible
-    if v1_flat[0]*v3_flat[1]-v1_flat[1]*v3_flat[0] < -eps:
+    if (v1_flat[0]*v3_flat[1]-v1_flat[1]*v3_flat[0] < -eps
+        and anglev3<old_angle1 and anglev1>old_angle2):
         # calculate boarding points for angles
         angle_list = [(old_angle1, a1_flat),
                       (old_angle2, a2_flat),
@@ -221,13 +230,14 @@ def dfs_step(v, f, variants, init_vertex, target_vertex):
         angle_list.sort(key = lambda val: val[0]) # new angles are in angle_list[2][1] and [1][1]
         target_dist_13 = np.linalg.norm((v[v1]+v[v3])/2 - v[target_vertex])
         stack_13 = old_stack[:]
-        stack_13.append([v1,v3, angle_list[2][1], angle_list[1][1]])
+        stack_13.append([v1,v3])
         variants.put((target_dist_13, [v1, v3, 
                                        v1_flat, v3_flat, 
                                        angle_list[2][1], angle_list[1][1], 
                                        stack_13]))
     # add edge 32 if it is possible
-    if v3_flat[0]*v2_flat[1]-v3_flat[1]*v2_flat[0]<-eps:
+    if (v3_flat[0]*v2_flat[1]-v3_flat[1]*v2_flat[0]<-eps
+        and anglev2<old_angle1 and anglev3>old_angle2):
         # calculate boarding points for angles
         angle_list = [(old_angle1, a1_flat),
                       (old_angle2, a2_flat),
@@ -237,7 +247,7 @@ def dfs_step(v, f, variants, init_vertex, target_vertex):
         target_dist_32 = np.linalg.norm((v[v2]+v[v3])/2 - v[target_vertex])
         #print('DISTS: ',v2, v3, (v[v2]+v[v3])/2, v[target_vertex], target_dist_32)
         stack_32 = old_stack[:]
-        stack_32.append([v3,v2, angle_list[2][1], angle_list[1][1]])
+        stack_32.append([v3,v2])
         variants.put((target_dist_32, [v3, v2,
                                        v3_flat, v2_flat,
                                        angle_list[2][1], angle_list[1][1], 
@@ -264,16 +274,14 @@ end_v = 40
 (test_v, test_fs) = gen_test_array(test_N)
 variants = initialize_queue_by_vertex(test_v, test_fs, start_v, end_v)
 res = False
-#while res==False and not variants.empty():
-[res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v)
-[res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v)
-[res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v)
-[res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v)
-[res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v)
-[res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v)
-[res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v)
-#print_queue(variants)
-#print(answ)
+i=0
+while res==False and not variants.empty():
+#for i in range(50):
+    [res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v,i)
+    #print('-------'+str(i)+'-------')
+    #print_queue(variants)
+    i+=1
+print(answ)
 
 (test_v, test_fs) = gen_test_array(4)
 test_convs = np.array([[0,1,2], [4,5,6], [9,10,11], [12,13,14], [3,7,11], [7,14,15]])
