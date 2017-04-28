@@ -1,3 +1,4 @@
+from convolutions import *
 from Data import *
 from keras.layers import Convolution1D, Dense, Dropout, Input, merge, GlobalMaxPooling1D
 from keras.models import Model
@@ -8,10 +9,10 @@ from scipy.signal import resample
 from uuid import uuid4
 
 
-def get_base_model(input_len, fsize,channel_number):
+def get_base_model(input_len, fsize,feature_num, feat_ch):
     '''Base network to be shared (eq. to feature extraction).
     '''
-    input_seq = Input(shape=(input_len, channel_number))
+    input_seq = Input(shape=(input_len, feature_num, feat_ch))
     nb_filters = 50
     convolved = Convolution1D(nb_filters, fsize, border_mode="same", activation="relu")(input_seq)
     convolved = Dropout(0.7)(convolved)
@@ -57,9 +58,10 @@ def get_resampled_data(data,axis):
     return [resample(data,epoch_len/4,axis=axis),resample(data,epoch_len/2,axis=axis),data]
 
 if __name__=='__main__':
+    experiment='em01'
     data_source = NeuromagData('mag')
     dim_order = ['trial','time','channel']
-    X,y=data_source.get_all_experiments_data(dim_order)
+    X,y=data_source.get_all_data(experiment,dim_order)
     dev = Neuromag('mag')
     augmenter = DataAugmentation(device=dev)
     Xm = augmenter.mirror_sensors(X)
@@ -74,3 +76,10 @@ if __name__=='__main__':
     with K.tf.device('/gpu:2'):
         model.fit(x=get_resampled_data(X,axis=1),y=to_onehot(y),batch_size=30, nb_epoch = nb_epoch,
                             callbacks=[tensor_board,reduce_lr], verbose=1, validation_split=0.2,shuffle=True)
+
+
+if __name__=='__main__':
+    dev = Neuromag('mag')
+    cn = Convolutions(dev)
+    convs = cn.get_1Dconvolutions(3)
+    cross_convs = cn.get_crosses_conv(convs)

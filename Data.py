@@ -64,14 +64,24 @@ class NeuromagData(Data):
         Data.__init__(self,path_to_data = os.path.join('DATA','Neuromag'))
 
 
-
     def get_data_labels(self):
         experiment_name = self.get_exeriments_names()[0]
         is_dir = lambda filename: os.path.isdir(os.path.join(self.path_to_data,experiment_name,filename))
         return filter(is_dir, os.listdir(os.path.join(self.path_to_data,experiment_name)))
 
+    def get_all_experiments_data(self,target_dim_order=['trial', 'channel', 'time']):
+        def_configuration = ['trial', 'channel', 'time']
+        transpose_mask = [def_configuration.index(dim) for dim in target_dim_order]
+        experiments = self.get_exeriments_names()
+        X = np.empty((0, self.num_channels, self.time_length), dtype=np.float64).transpose(transpose_mask)
+        y = np.empty((0), dtype=np.int)
+        for exp in experiments:
+            X_tmp,y_tmp = self.get_data_from_exp(exp,target_dim_order)
+            X = np.append(X,X_tmp,axis=0)
+            y = np.append(y,y_tmp,axis=0)
+        return X,y
 
-    def get_all_data(self,experiment,target_dim_order=['trial', 'channel', 'time']):
+    def get_data_from_exp(self,experiment,target_dim_order=['trial', 'channel', 'time']):
         # @dim_order - list of strings in format ['trial','channel','time']
         labels = self.get_data_labels()
 
@@ -140,6 +150,7 @@ class DataAugmentation:
 if __name__ == '__main__':
     dev = Neuromag('mag')
     data_source = NeuromagData('mag')
-    data,label = data_source.get_all_data('em01',target_dim_order = ['trial','time','channel'])
-    augmenter = DataAugmentation(device=dev)
-    mirrored_data = augmenter.mirror_sensors(data)
+    data,label = data_source.get_all_experiments_data()
+    print 'ok'
+    # augmenter = DataAugmentation(device=dev)
+    # mirrored_data = augmenter.mirror_sensors(data)
