@@ -634,7 +634,7 @@ def plot_tracing_results(v,f,trace):
                 zs = [trace[i][2], trace[i+1][2]], color = c)
     plt.show()
 
-# plot directions for one poiint using matplotlib
+# plot directions for one point using matplotlib
 def plot_dir_results(v,f,start_v, directions):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -665,6 +665,42 @@ def plot_dir_results(v,f,start_v, directions):
                     zs = [v[start_v][2], v[start_v][2]+poss_dirs[2]], color = 'g')
     plt.show()
 
+# plot one combination of convolutions
+def plot_combination(v,f,c,cmb):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    # plot grid
+    edge_set = set()
+    for face in f: # sort edges
+        if face[0]>face[1]:
+            edge_set.add((face[1], face[0]))
+        else:
+            edge_set.add((face[0], face[1]))
+        if face[0]>face[2]:
+            edge_set.add((face[2], face[0]))
+        else:
+            edge_set.add((face[0], face[2]))
+        if face[2]>face[1]:
+            edge_set.add((face[1], face[2]))
+        else:
+            edge_set.add((face[2], face[1]))
+    for ed in edge_set: # plot edges
+        ax.plot([v[ed[0]][0], v[ed[1]][0]],
+                [v[ed[0]][1], v[ed[1]][1]],
+                zs = [v[ed[0]][2], v[ed[1]][2]], color='b')
+    # plot convolutions in the combination
+    eds = [(v[c[curr_c][i]], v[c[curr_c][i+1]]) for curr_c in cmb for i in range(len(c[curr_c])-1)]
+    for ed in eds:
+        ax.plot([ed[0][0], ed[1][0]],
+                [ed[0][1], ed[1][1]],
+                zs = [ed[0][2], ed[1][2]], color = 'g', linewidth=2.0)
+    # plot combination lines
+    mids = [c[curr_c][len(c[curr_c])/2] for curr_c in cmb]
+    for i in range(len(mids)-1):
+        ax.plot([v[mids[i]][0], v[mids[i+1]][0]],
+                [v[mids[i]][1], v[mids[i+1]][1]],
+                zs = [v[mids[i]][2], v[mids[i+1]][2]], color = 'r', linewidth=2.0)
+    plt.show()
 	
 
 # tests
@@ -723,7 +759,7 @@ if __name__=='__main__':
     # generate test surface for tracing
     test_N = 4
     start_v = 1
-    end_v = 110
+    end_v = 50
     (test_v, test_fs) = gen_test_array(test_N)
     # (test_v, test_fs) = gen_test_3d_array(test_N)
     # (test_v, test_fs) = gen_test_3d_hemisphere(20,8)
@@ -731,6 +767,8 @@ if __name__=='__main__':
     #plot_dir_results(test_v, test_fs, start_v,res[start_v])
     test_convs = np.array([[0,1,2], [4,5,6], [9,10,11], [12,13,14], [3,7,11], [7,14,15],[10,9,8]])
     res = make_geodesic_conv_combinations(test_v, test_fs, test_convs, 3, 0.1, 0.1, 0.1)
+    plot_combination(test_v,test_fs,test_convs,res[0][0])
+    plot_combination(test_v,test_fs,test_convs,res[1][0])
     assert([r[0] for r in res]==[[0,1,6],[1,6,3]])
     # find path and trace it if found
     (test_v, test_fs) = gen_test_3d_hemisphere(20,8)
