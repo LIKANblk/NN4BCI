@@ -373,7 +373,11 @@ def initialize_dir_queue(v,f,start_v):
     return (variants, curr_result, fc)
 
 
-# step function for calculation of directions
+# step function for calculation of directions.
+# variants is queue of edges:
+# (distance => [v1, v2, v1_flat(x,y), v2_flat(x,y),
+#              angle_start_flat(x,y), angle_end_flat(x,y), initial_edge])
+# curr_result is dict of: vertex => [(direction, distance)]
 # returns: [finish_flag, variants, curr_result]
 def dir_step(v, f, fc, variants, start_v, curr_result):
     # get the vertex nearest to start from variants
@@ -574,6 +578,7 @@ def make_geodesic_conv_combinations(v, f, c, N, dth, dfi, Elen):
         c_len = poss_part.priority
         c_list = poss_part.value[0]
         c_dist = poss_part.value[1]
+        c_init_center = c[c_list[0]][len(c[c_list[0]])/2]
         # if combination found, add it to results
         if c_len==N:
             if c_list[0]<c_list[-1]:
@@ -582,8 +587,12 @@ def make_geodesic_conv_combinations(v, f, c, N, dth, dfi, Elen):
             # find all possible next elements
             poss_next = [pr for pr in conv_pairs if pr[0]==c_list[-1] and pr[1]!=c_list[-2]]
             for pn in poss_next:
-                # if distance from current element to beginning is appropriate, add it
-                if math.fabs((pn[2]-c_dist)) < c_dist*Elen:
+                # check distance from starting point to new point
+                center_pn = c[pn[1]][len(c[pn[1]])/2]
+                dists = [dir_e[1] for dir_e in dirs[c_init_center][center_pn]]
+                start_dist_correct = any(math.fabs(dist_e/len(c_list)-c_dist)<c_dist*Elen for dist_e in dists)
+                # distance from current element to beginning is appropriate
+                if math.fabs((pn[2]-c_dist)) < c_dist*Elen and start_dist_correct:
                     new_lst = c_list[:]
                     new_lst.append(pn[1])
                     result_queue.put(PQEntry(c_len+1, [new_lst, c_dist]))
@@ -714,13 +723,13 @@ if __name__=='__main__':
     # generate test surface for tracing
     test_N = 4
     start_v = 1
-    end_v = 15
+    end_v = 110
     (test_v, test_fs) = gen_test_array(test_N)
     # (test_v, test_fs) = gen_test_3d_array(test_N)
     # (test_v, test_fs) = gen_test_3d_hemisphere(20,8)
 	#res = find_all_directions(test_v,test_fs)
     #plot_dir_results(test_v, test_fs, start_v,res[start_v])
-    test_convs = np.array([[0,1,2], [4,5,6], [9,10,11], [12,13,14], [3,7,11], [7,14,15],[8,9,10]])
+    test_convs = np.array([[0,1,2], [4,5,6], [9,10,11], [12,13,14], [3,7,11], [7,14,15],[10,9,8]])
     res = make_geodesic_conv_combinations(test_v, test_fs, test_convs, 3, 0.1, 0.1, 0.1)
     assert([r[0] for r in res]==[[0,1,6],[1,6,3]])
     # find path and trace it if found
