@@ -207,6 +207,20 @@ if __name__=='__main__':
     convs = cn.get_1Dconvolution_channels(3)
     vs = VisualisationConvolutions(cn)
     vs._visualise_target_convolutions(convs[1:10],np.random.rand(9),'qqwerty')
+    
+    import conv_trees as cc
+    # test of path tracing (have no use just now)
+    init_v = 0
+    target_v = 90
+    (result, path) = cc.find_path(cn.topography_3D,cc.curr_faces,init_v,target_v)
+    if result:
+        trace_seq = cc.trace_path(cn.topography_3D, cc.curr_faces, init_v, target_v, path)
+        cc.plot_tracing_results(cn.topography_3D,cc.curr_faces,trace_seq)
+    # test for convolutions --- TODO: read real convolutions
+    test_convs = np.array([])
+    res = cc.make_geodesic_conv_combinations(cn.topography_3D, test_convs, 3, 0.1, 0.1, 0.1, cc.curr_faces)
+    #plot_combination(cn.topography_3D,cc.curr_faces,test_convs,res[0][0])
+    
     print 'ok'
 
 
