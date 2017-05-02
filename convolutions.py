@@ -135,7 +135,7 @@ class VisualisationConvolutions:
         # plot convolution primitive
         # @sensors_indices indices of channels, forming convolution
         # @conv_score - meajure of activation of convolution, have to be [0:1]
-        cm = matplotlib.cm.get_cmap('inferno')
+        cm = matplotlib.cm.get_cmap('gist_rainbow')
         color = cm(conv_score)
         conv_length = len(sensors_indices)
         is_even = lambda x: x % 2 == 0

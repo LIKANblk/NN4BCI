@@ -701,7 +701,7 @@ def plot_combination(v,f,c,cmb):
                 [v[mids[i]][1], v[mids[i+1]][1]],
                 zs = [v[mids[i]][2], v[mids[i+1]][2]], color = 'r', linewidth=2.0)
     plt.show()
-	
+
 
 # tests
 
