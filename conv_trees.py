@@ -2,10 +2,351 @@ import math
 import numpy as np
 import Queue as qu
 
-if __name__=='__main__':
-    import matplotlib.pyplot as plt
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from mpl_toolkits.mplot3d import proj3d
+
+# parameters of the current system
+curr_faces = [[   88,    97,    94],
+              [   53,    51,    52],
+              [   50,    53,    43],
+              [   50,    53,    51],
+              [   80,    88,    97],
+              [   16,     0,     1],
+              [   31,    50,    51],
+              [   89,    88,    94],
+              [   96,    97,    94],
+              [   56,    62,    63],
+              [   55,    56,    63],
+              [   55,    56,    57],
+              [   72,    65,    81],
+              [   17,    16,     0],
+              [   17,    29,    28],
+              [    2,    11,     1],
+              [    2,     0,     3],
+              [    2,     0,     1],
+              [    8,    16,    19],
+              [    8,    16,     1],
+              [    8,    11,     1],
+              [    9,     8,    19],
+              [    9,     8,    11],
+              [   49,    48,    90],
+              [   79,    80,    81],
+              [   79,    72,    81],
+              [   79,    80,    88],
+              [   78,    79,    72],
+         [   78,    89,    88],
+         [   78,    79,    88],
+         [   64,    73,    63],
+         [   64,    62,    63],
+         [   64,    65,    62],
+         [   64,    72,    65],
+         [   18,    17,    29],
+         [   18,    20,    19],
+         [   18,    16,    19],
+         [   18,    17,    16],
+         [    4,     2,    11],
+         [   54,    58,     7],
+         [   54,    58,    55],
+         [   54,     4,     7],
+         [   54,     4,     2],
+         [   54,    55,    57],
+         [   54,    57,     3],
+         [   54,     2,     3],
+         [   42,    32,    31],
+         [   42,    50,    43],
+         [   42,    31,    50],
+         [   33,    32,    31],
+         [   33,    32,    35],
+         [   21,    20,    23],
+         [   21,    22,    23],
+         [   21,    22,    37],
+         [   10,    20,    23],
+         [   10,     9,    19],
+         [   10,    20,    19],
+         [   34,    33,    35],
+         [   34,    33,    29],
+         [   34,    21,    35],
+         [   34,    21,    20],
+         [   34,    18,    29],
+         [   34,    18,    20],
+         [  101,    99,   100],
+         [   47,    46,    43],
+         [   47,    53,    43],
+         [   47,    48,    53],
+         [   47,    49,    48],
+         [   47,    49,    46],
+         [   44,    46,    43],
+         [   44,    42,    43],
+         [   44,    42,    32],
+         [   71,    78,    72],
+         [   71,    64,    73],
+         [   71,    64,    72],
+         [   71,    70,    73],
+         [   76,    78,    89],
+         [   76,    86,    89],
+         [   76,    86,    75],
+         [   30,    33,    31],
+         [   30,    31,    51],
+         [   30,    29,    28],
+         [   30,    33,    29],
+         [   36,    21,    35],
+         [   36,    21,    37],
+         [   13,    22,    23],
+         [   13,    10,    23],
+         [   13,    10,    12],
+         [   13,    22,    24],
+         [    5,     9,    11],
+         [    5,     4,    11],
+         [    5,    10,     9],
+         [    5,    10,    12],
+         [   91,   101,    92],
+         [   91,    48,    90],
+         [   91,    92,    90],
+         [   98,    48,    53],
+         [   98,   101,    99],
+         [   98,    91,    48],
+         [   98,    91,   101],
+         [   98,    53,    52],
+         [   98,    99,    52],
+         [   95,   101,    92],
+         [   95,   101,   100],
+         [   95,    96,    94],
+         [   95,    96,   100],
+         [   25,    22,    24],
+         [   25,    22,    37],
+         [   83,    49,    90],
+         [   83,    49,    40],
+         [   88,    97,    94],
+         [   53,    51,    52],
+         [   50,    53,    43],
+         [   50,    53,    51],
+         [   80,    88,    97],
+         [   16,     0,     1],
+         [   31,    50,    51],
+         [   89,    88,    94],
+         [   96,    97,    94],
+         [   56,    62,    63],
+         [   55,    56,    63],
+         [   55,    56,    57],
+         [   72,    65,    81],
+         [   17,    16,     0],
+             [   17,    29,    28],
+             [    2,    11,     1],
+             [    2,     0,     3],
+             [    2,     0,     1],
+             [    8,    16,    19],
+             [    8,    16,     1],
+             [    8,    11,     1],
+             [    9,     8,    19],
+             [    9,     8,    11],
+             [   49,    48,    90],
+             [   79,    80,    81],
+             [   79,    72,    81],
+             [   78,    79,    72],
+             [   78,    89,    88],
+             [   78,    79,    88],
+             [   64,    73,    63],
+             [   64,    62,    63],
+             [   64,    65,    62],
+             [   64,    72,    65],
+             [   18,    17,    29],
+             [   18,    20,    19],
+             [   18,    16,    19],
+             [   18,    17,    16],
+             [    4,     2,    11],
+             [   54,    58,     7],
+             [   54,    58,    55],
+             [   54,     4,     7],
+             [   54,     4,     2],
+             [   54,    55,    57],
+             [   54,    57,     3],
+             [   54,     2,     3],
+             [   42,    32,    31],
+             [   42,    50,    43],
+             [   42,    31,    50],
+             [   33,    32,    31],
+             [   33,    32,    35],
+             [   21,    20,    23],
+             [   21,    22,    23],
+             [   21,    22,    37],
+             [   10,    20,    23],
+             [   10,     9,    19],
+             [   10,    20,    19],
+             [   34,    33,    35],
+             [   34,    33,    29],
+             [   34,    21,    35],
+             [   34,    21,    20],
+             [   34,    18,    29],
+             [   34,    18,    20],
+             [  101,    99,   100],
+             [   47,    46,    43],
+             [   47,    53,    43],
+             [   47,    48,    53],
+             [   47,    49,    48],
+             [   47,    49,    46],
+             [   44,    46,    43],
+             [   44,    42,    43],
+             [   44,    42,    32],
+             [   71,    78,    72],
+             [   71,    64,    73],
+             [   71,    64,    72],
+             [   71,    70,    73],
+             [   76,    78,    89],
+             [   76,    86,    89],
+             [   76,    86,    75],
+             [   30,    33,    31],
+             [   30,    31,    51],
+             [   30,    29,    28],
+             [   30,    33,    29],
+             [   36,    21,    35],
+             [   36,    21,    37],
+             [   13,    22,    23],
+             [   13,    10,    23],
+             [   13,    10,    12],
+             [   13,    22,    24],
+             [    5,     9,    11],
+             [    5,     4,    11],
+             [    5,    10,     9],
+             [    5,    10,    12],
+             [   91,   101,    92],
+             [   91,    48,    90],
+             [   91,    92,    90],
+             [   98,    48,    53],
+             [   98,   101,    99],
+             [   98,    91,    48],
+             [   98,    91,   101],
+             [   98,    53,    52],
+             [   98,    99,    52],
+             [   95,   101,    92],
+             [   95,   101,   100],
+             [   95,    96,    94],
+             [   95,    96,   100],
+             [   25,    22,    24],
+             [   25,    22,    37],
+             [   83,    49,    90],
+             [   83,    49,    40],
+             [   87,    86,    89],
+             [   87,    89,    94],
+             [   87,    95,    94],
+             [   87,    95,    92],
+             [   93,    92,    90],
+             [   93,    83,    90],
+             [   93,    87,    92],
+             [   93,    87,    86],
+             [   84,    86,    75],
+             [   84,    85,    75],
+             [   84,    85,    82],
+             [   84,    93,    86],
+             [   84,    83,    82],
+             [   84,    93,    83],
+             [   60,    70,    73],
+             [   68,    85,    27],
+             [   45,    32,    35],
+             [   45,    44,    32],
+             [   45,    36,    35],
+             [   77,    76,    75],
+             [   77,    71,    70],
+             [   77,    71,    78],
+             [   77,    76,    78],
+             [   14,    13,    24],
+             [   14,    27,    24],
+             [    6,     4,     7],
+             [    6,     5,     4],
+             [    6,     5,    12],
+             [   41,    83,    40],
+             [   41,    83,    82],
+             [   26,    85,    82],
+             [   26,    41,    82],
+             [   26,    41,    25],
+             [   26,    85,    27],
+             [   26,    27,    24],
+             [   26,    25,    24],
+             [   59,    60,    66],
+             [   59,     6,    66],
+             [   59,    58,     7],
+             [   59,     6,     7],
+             [   61,    60,    73],
+             [   61,    73,    63],
+             [   61,    59,    58],
+             [   61,    59,    60],
+             [   61,    55,    63],
+             [   61,    58,    55],
+             [   67,    68,    27],
+             [   67,    14,    66],
+             [   67,    14,    27],
+             [   39,    44,    46],
+             [   39,    45,    44],
+             [   39,    49,    40],
+             [   39,    49,    46],
+             [   15,     6,    66],
+             [   15,     6,    12],
+             [   15,    14,    66],
+             [   15,    13,    12],
+             [   15,    14,    13],
+             [   69,    67,    68],
+             [   69,    60,    70],
+             [   69,    60,    66],
+             [   69,    67,    66],
+             [   38,    45,    36],
+             [   38,    39,    45],
+             [   38,    36,    37],
+             [   38,    25,    37],
+             [   38,    41,    25],
+             [   38,    41,    40],
+             [   38,    39,    40],
+             [   74,    69,    68],
+             [   74,    77,    75],
+             [   74,    77,    70],
+             [   74,    69,    70],
+             [   74,    85,    75],
+             [   74,    68,    85]]
+
+# detect non-manifolds faces, correct vertices directions
+def process_triangles(triangles):
+    if triangles==[]:
+        return []
+    # remove duplicates (not with set because list are not hashable)
+    tr_sets = [set(v) for v in triangles]
+    new_tr_sets = []
+    for tr in tr_sets:
+        if tr not in new_tr_sets:
+            new_tr_sets.append(tr)
+    triangles = [list(v) for v in new_tr_sets]
+    rest = [(tr, set([(tr[0],tr[1]),
+                     (tr[1],tr[2]),
+                     (tr[2],tr[0])])) for tr in triangles]
+    result = [rest[0][0]]
+    rest = rest[1:]
+    current_index = 0
+    while True:
+        # find all triangles in rest adjacent to current
+        c_tr = result[current_index]
+        # search in correct direction
+        dir_list = set([(c_tr[1],c_tr[0]),
+                        (c_tr[2],c_tr[1]),
+                        (c_tr[0],c_tr[2])])
+        new_trs = [v[0] for v in rest if dir_list & v[1]]
+        # search in incorrect direction
+        rdir_list = set([(c_tr[0],c_tr[1]),
+                         (c_tr[1],c_tr[2]),
+                         (c_tr[2],c_tr[0])])
+        new_r_trs = [v[0] for v in rest if rdir_list & v[1]]
+        # check number of data units found
+        assert(len(new_trs)+len(new_r_trs)<=3)
+        # TODO: add full checks
+        # change 'rest' list
+        rest = [v for v in rest if (v[0] not in new_trs) and (v[0] not in new_r_trs)]
+        # add data to results
+        result.extend(new_trs)
+        result.extend([[v[2],v[1],v[0]] for v in new_r_trs])
+        current_index += 1
+        # exit conditions
+        if rest==[]:
+            return result
+        assert(current_index<len(result))
+
 
 # calculate 3d direction of convolution points
 # TODO: remake to process any number of points in a convolution
@@ -286,11 +627,13 @@ def dfs_step(v, f, variants, init_vertex, target_vertex, step_num):
 
 # apply depth-first search (dfs_step) to calculate path
 def find_path(v,f,init_vertex,target_vertex):
-    variants = initialize_queue_by_vertex(test_v, test_fs, start_v, end_v)
+    # preprocess faces
+    f = process_triangles(f)
+    variants = initialize_queue_by_vertex(v, f, init_vertex, target_vertex)
     res = False
     i=0
     while res==False and not variants.empty():
-        [res, variants, answ] = dfs_step(test_v, test_fs, variants, start_v, end_v,i)
+        [res, variants, answ] = dfs_step(v, f, variants, init_vertex, target_vertex,i)
         i+=1
     return (res,answ)
 
@@ -373,7 +716,11 @@ def initialize_dir_queue(v,f,start_v):
     return (variants, curr_result, fc)
 
 
-# step function for calculation of directions
+# step function for calculation of directions.
+# variants is queue of edges:
+# (distance => [v1, v2, v1_flat(x,y), v2_flat(x,y),
+#              angle_start_flat(x,y), angle_end_flat(x,y), initial_edge])
+# curr_result is dict of: vertex => [(direction, distance)]
 # returns: [finish_flag, variants, curr_result]
 def dir_step(v, f, fc, variants, start_v, curr_result):
     # get the vertex nearest to start from variants
@@ -445,9 +792,6 @@ def dir_step(v, f, fc, variants, start_v, curr_result):
                              [v3, v2, v3_flat, v2_flat,
                               angle_list[2][1], angle_list[1][1], initial_edge]))
     # if v3 should be added to results, add it
-    #print('--------------')
-    #print(old_angle1, old_angle2)
-    #print('--------------')
     if old_angle1>=anglev3-eps and old_angle2<=anglev3+eps:
         # calculate direction to v3
         init_v1 = initial_edge[0]
@@ -456,20 +800,16 @@ def dir_step(v, f, fc, variants, start_v, curr_result):
         init_v2_f = initial_edge[3]
         # v1_f + alpha*(v2_f-v1_f) = beta*v3_f
         # v1_f = alpha*(v1_f-v2_f) + beta*v3_f
-        #print(init_v1_f,init_v2_f,v3_flat)
         D = (init_v1_f[0]-init_v2_f[0])*v3_flat[1] - (init_v1_f[1]-init_v2_f[1])*v3_flat[0]
         Da = init_v1_f[0]*v3_flat[1] - init_v1_f[1]*v3_flat[0]
-        #print(D,Da)
         alpha = Da/D
-        #print(curr_result[init_v1][0], alpha, curr_result[init_v2][0])
         new_dir = curr_result[init_v1][0][0] + alpha*(curr_result[init_v2][0][0]-curr_result[init_v1][0][0])
         curr_result = add_direction(curr_result, v3, new_dir/np.linalg.norm(new_dir), np.linalg.norm(v3_flat))
-    #print('--------------')
     return (False, variants, curr_result)
 
 	
 # find 3d directions towards all other points from one specified vertex start_v
-# return: {point->[3d_direction(np.array)]}
+# return: {point->[(3d_direction(np.array),distance)]}
 def find_directions_by_vertex(v,f,start_v):
     # generate initial state for search process
     (variants, curr_result, fc) = initialize_dir_queue(v, f, start_v)
@@ -482,18 +822,98 @@ def find_directions_by_vertex(v,f,start_v):
     return curr_result
 
 # for each vertex find all direction to other vertices
+# result: {point -> {point -> [(3ddirection, distance)]}}
 def find_all_directions(v,f):
     res = {}
     for curr_v in range(len(v)):
+        print 'Processing v'+str(curr_v+1)
         res[curr_v] = find_directions_by_vertex(v,f,curr_v)
     return res
 
+# check if directions of two convolutions are similar enough
 def check_possibility_of_pairing(dirs1, dirs2, min_prec):
     for (d1,dist1) in dirs1:
         for (d2,dist2) in dirs2:
             if math.fabs(np.dot(d1,d2))>=min_prec:
                 return True
     return False
+
+# save directions data to file
+def save_directions_data(data, filename):
+    try:
+        with open(filename, 'wt') as f:
+            for src in data.keys():
+                for dst in data[src].keys():
+                    for dirs in data[src][dst]:
+                        d = dirs[0]
+                        ds = dirs[1]
+                        f.write("{};{};{};{};{};{}\n".format(src, dst,
+                                                             d[0],d[1],d[2],
+                                                             ds))
+    except IOError as e:
+        print 'I/O error while saving in file {0} ({1}): {2}'.format(
+            filename, e.errno, e.strerror)
+
+# load directions data from file
+# return (success_flag, result)
+def load_directions_data(filename):
+    line_number = 1
+    result = {}
+    try:
+        with open(filename, 'rt') as f:
+            lines = f.readlines()
+            max_vertex = -1
+            for ldata in lines:
+                tokens = ldata.split(';')
+                # check structure: int;int;coords{3};dist
+                if len(tokens)!=6:
+                    raise ValueError
+                src = int(tokens[0])
+                if src>max_vertex:
+                    max_vertex = src
+                dst = int(tokens[1])
+                if dst>max_vertex:
+                    max_vertex = dst
+                direction = np.array([float(v) for v in tokens[2:5]])
+                direction = direction/np.linalg.norm(direction)
+                dist = float(tokens[5])
+                if src not in result.keys():
+                    result[src] = {}
+                if dst not in result[src].keys():
+                    result[src][dst] = []
+                result[src][dst].append((direction,dist))
+                line_number += 1
+        # fill empty directions:
+        # for each vertex index from 0 to maximal add all lists (empty)
+        for i in range(max_vertex+1):
+            if i not in result.keys():
+                result[i] = {}
+            for j in range(max_vertex+1):
+                if j not in result[i].keys():
+                    result[i][j] = []
+        return (True, result)
+    except IOError as e:
+        print 'I/O error while loading file {0} ({1}): {2}'.format(
+            filename, e.errno, e.strerror)
+    except ValueError:
+        print 'Wrong line {0} in file {1}'.format(line_number, filename)
+    return (False, {})
+
+
+# get directions to all vertices from either file or data
+def get_direcions_data(v,f,filename):
+    # try to load data from file 'filename'
+    (load_success, dirs) = load_directions_data(filename)
+    if load_success:
+        # data loaded => return values
+        return dirs
+    else:
+        # process data
+        dirs = find_all_directions(v,f)
+        # save results
+        save_directions_data(dirs, filename)
+        # return processed data
+        return dirs
 	
 # find all combinations for the convolution specified by geodetic directions
 # v: electrode positions, numpy array nv x 3
@@ -503,12 +923,15 @@ def check_possibility_of_pairing(dirs1, dirs2, min_prec):
 #   convolution and center of new convolution
 # dfi: maximum angle between two convolutions to be paired
 # Elen: maximum relative difference of distances from one vertex in list to another
+# f: faces of the triangles to calculate geodetic lines
 # return: list of lists of convolution to combine with characteristic length
-def make_geodesic_conv_combinations(v, f, c, N, dth, dfi, Elen):
+def make_geodesic_conv_combinations(v, c, N, dth, dfi, Elen, f=curr_faces, filename='./directions.csv'):
     cos_dth = math.cos(dth)
     cos_dfi = math.cos(dfi)
+    # remove duplicate faces, detect non-manifolds
+    f = process_triangles(f)
     # find directions to all other vertices for each vertex
-    dirs = find_all_directions(v,f)
+    dirs = get_direcions_data(v,f,filename)
     conv_pairs = []
     # for each convolution
     for cc in range(len(c)):
@@ -548,7 +971,6 @@ def make_geodesic_conv_combinations(v, f, c, N, dth, dfi, Elen):
                 if pair_found:
                     appropr_v.append((cv, cv_dist))
 		# for each found vertex find all appropriate convolution
-        #print(c[cc], appropr_v)
         appropr_convs = []
         for poss_cc in range(len(c)):
             lpc = len(c[poss_cc])
@@ -574,6 +996,7 @@ def make_geodesic_conv_combinations(v, f, c, N, dth, dfi, Elen):
         c_len = poss_part.priority
         c_list = poss_part.value[0]
         c_dist = poss_part.value[1]
+        c_init_center = c[c_list[0]][len(c[c_list[0]])/2]
         # if combination found, add it to results
         if c_len==N:
             if c_list[0]<c_list[-1]:
@@ -582,8 +1005,12 @@ def make_geodesic_conv_combinations(v, f, c, N, dth, dfi, Elen):
             # find all possible next elements
             poss_next = [pr for pr in conv_pairs if pr[0]==c_list[-1] and pr[1]!=c_list[-2]]
             for pn in poss_next:
-                # if distance from current element to beginning is appropriate, add it
-                if math.fabs((pn[2]-c_dist)) < c_dist*Elen:
+                # check distance from starting point to new point
+                center_pn = c[pn[1]][len(c[pn[1]])/2]
+                dists = [dir_e[1] for dir_e in dirs[c_init_center][center_pn]]
+                start_dist_correct = any(math.fabs(dist_e/len(c_list)-c_dist)<c_dist*Elen for dist_e in dists)
+                # distance from current element to beginning is appropriate
+                if math.fabs((pn[2]-c_dist)) < c_dist*Elen and start_dist_correct:
                     new_lst = c_list[:]
                     new_lst.append(pn[1])
                     result_queue.put(PQEntry(c_len+1, [new_lst, c_dist]))
@@ -625,7 +1052,7 @@ def plot_tracing_results(v,f,trace):
                 zs = [trace[i][2], trace[i+1][2]], color = c)
     plt.show()
 
-# plot directions for one poiint using matplotlib
+# plot directions for one point using matplotlib
 def plot_dir_results(v,f,start_v, directions):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -656,7 +1083,71 @@ def plot_dir_results(v,f,start_v, directions):
                     zs = [v[start_v][2], v[start_v][2]+poss_dirs[2]], color = 'g')
     plt.show()
 
-	
+# plot one combination of convolutions
+def plot_combination(v,f,c,cmb):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    # plot grid
+    edge_set = set()
+    for face in f: # sort edges
+        if face[0]>face[1]:
+            edge_set.add((face[1], face[0]))
+        else:
+            edge_set.add((face[0], face[1]))
+        if face[0]>face[2]:
+            edge_set.add((face[2], face[0]))
+        else:
+            edge_set.add((face[0], face[2]))
+        if face[2]>face[1]:
+            edge_set.add((face[1], face[2]))
+        else:
+            edge_set.add((face[2], face[1]))
+    for ed in edge_set: # plot edges
+        ax.plot([v[ed[0]][0], v[ed[1]][0]],
+                [v[ed[0]][1], v[ed[1]][1]],
+                zs = [v[ed[0]][2], v[ed[1]][2]], color='b')
+    # plot convolutions in the combination
+    eds = [(v[c[curr_c][i]], v[c[curr_c][i+1]]) for curr_c in cmb for i in range(len(c[curr_c])-1)]
+    for ed in eds:
+        ax.plot([ed[0][0], ed[1][0]],
+                [ed[0][1], ed[1][1]],
+                zs = [ed[0][2], ed[1][2]], color = 'g', linewidth=2.0)
+    # plot combination lines
+    mids = [c[curr_c][len(c[curr_c])/2] for curr_c in cmb]
+    for i in range(len(mids)-1):
+        ax.plot([v[mids[i]][0], v[mids[i+1]][0]],
+                [v[mids[i]][1], v[mids[i+1]][1]],
+                zs = [v[mids[i]][2], v[mids[i+1]][2]], color = 'r', linewidth=2.0)
+    plt.show()
+
+
+
+# plot one combination of convolutions
+def plot_surface(v,f):
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    # plot vertices
+    vx = [v[i][0] for i in range(len(v))]
+    vy = [v[i][1] for i in range(len(v))]
+    vz = [v[i][2] for i in range(len(v))]
+    ax.scatter(vx,vy,zs=vz,color='r')
+    # plot faces
+    for i in range(len(f)):
+        tri = Poly3DCollection([(v[f[i][0]], v[f[i][1]], v[f[i][2]])])
+        tri.set_color('g')
+        tri.set_edgecolor('g')
+        ax.add_collection3d(tri)
+    # plot numbers
+    labels = []
+    for i in range(len(vx)):
+        cx = vx[i]
+        cy = vy[i]
+        cz = vz[i]
+#        x2, y2, _ = proj3d.proj_transform(cx,cy,cz, ax.get_proj())
+#        labels.append(ax.annotate(str(i),xy=(x2,y2), xytext=(x2,y2)))
+    ax.view_init(45, -90)
+    plt.show()
+
 
 # tests
 
@@ -711,17 +1202,21 @@ def gen_test_3d_hemisphere(B,L):
     return (vs,fs)
 
 if __name__=='__main__':
+    # test triangulation results
+    curr_faces = process_triangles(curr_faces)
     # generate test surface for tracing
     test_N = 4
     start_v = 1
-    end_v = 15
+    end_v = 50
     (test_v, test_fs) = gen_test_array(test_N)
     # (test_v, test_fs) = gen_test_3d_array(test_N)
     # (test_v, test_fs) = gen_test_3d_hemisphere(20,8)
 	#res = find_all_directions(test_v,test_fs)
     #plot_dir_results(test_v, test_fs, start_v,res[start_v])
-    test_convs = np.array([[0,1,2], [4,5,6], [9,10,11], [12,13,14], [3,7,11], [7,14,15],[8,9,10]])
-    res = make_geodesic_conv_combinations(test_v, test_fs, test_convs, 3, 0.1, 0.1, 0.1)
+    test_convs = np.array([[0,1,2], [4,5,6], [9,10,11], [12,13,14], [3,7,11], [7,14,15],[10,9,8]])
+    res = make_geodesic_conv_combinations(test_v, test_convs, 3, 0.1, 0.1, 0.1, test_fs)
+    plot_combination(test_v,test_fs,test_convs,res[0][0])
+    plot_combination(test_v,test_fs,test_convs,res[1][0])
     assert([r[0] for r in res]==[[0,1,6],[1,6,3]])
     # find path and trace it if found
     (test_v, test_fs) = gen_test_3d_hemisphere(20,8)

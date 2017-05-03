@@ -199,7 +199,7 @@ class VisualisationConvolutions:
         # plot convolution primitive
         # @sensors_indices indices of channels, forming convolution
         # @conv_score - meajure of activation of convolution, have to be [0:1]
-        cm = matplotlib.cm.get_cmap('inferno')
+        cm = matplotlib.cm.get_cmap('gist_rainbow')
         color = cm(conv_score)
         conv_length = len(sensors_indices)
         is_even = lambda x: x % 2 == 0
@@ -282,14 +282,30 @@ class VisualisationConvolutions:
             plt.savefig(os.path.join(test_conv, title + '.png'))
             plt.close()
 
+def Peters_test():
+    import conv_trees as cc
+    # test of path tracing (have no use just now)
+    init_v = 0
+    target_v = 90
+    (result, path) = cc.find_path(cn.topography_3D,cc.curr_faces,init_v,target_v)
+    if result:
+        trace_seq = cc.trace_path(cn.topography_3D, cc.curr_faces, init_v, target_v, path)
+        cc.plot_tracing_results(cn.topography_3D,cc.curr_faces,trace_seq)
+    # test for convolutions --- TODO: read real convolutions
+    test_convs = np.array([])
+    res = cc.make_geodesic_conv_combinations(cn.topography_3D, test_convs, 3, 0.1, 0.1, 0.1, cc.curr_faces, 'directions_Real.csv')
+    #plot_combination(cn.topography_3D,cc.curr_faces,test_convs,res[0][0])
 
+    
 if __name__=='__main__':
     dev = GSN128()
     cn = Convolutions(dev)
     vs = VisualisationConvolutions(cn)
     convs = cn.get_1Dconvolutions(3)
     # vs.visualise_convs_on_mne_topomap(convs)
-
+    print 'ok'
+    convs = cn.get_1Dconvolutions(4)
+    vs.visualise_convs_on_mne_topomap(convs)
     cross_convs = cn.get_crosses_conv(3)
     vs.visualise_convs_on_mne_topomap(map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
 
