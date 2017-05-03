@@ -218,7 +218,7 @@ if __name__=='__main__':
         cc.plot_tracing_results(cn.topography_3D,cc.curr_faces,trace_seq)
     # test for convolutions --- TODO: read real convolutions
     test_convs = np.array([])
-    res = cc.make_geodesic_conv_combinations(cn.topography_3D, test_convs, 3, 0.1, 0.1, 0.1, cc.curr_faces)
+    res = cc.make_geodesic_conv_combinations(cn.topography_3D, test_convs, 3, 0.1, 0.1, 0.1, cc.curr_faces, 'directions_Real.csv')
     #plot_combination(cn.topography_3D,cc.curr_faces,test_convs,res[0][0])
     
     print 'ok'

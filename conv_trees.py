@@ -809,7 +809,7 @@ def dir_step(v, f, fc, variants, start_v, curr_result):
 
 	
 # find 3d directions towards all other points from one specified vertex start_v
-# return: {point->[3d_direction(np.array)]}
+# return: {point->[(3d_direction(np.array),distance)]}
 def find_directions_by_vertex(v,f,start_v):
     # generate initial state for search process
     (variants, curr_result, fc) = initialize_dir_queue(v, f, start_v)
@@ -822,18 +822,98 @@ def find_directions_by_vertex(v,f,start_v):
     return curr_result
 
 # for each vertex find all direction to other vertices
+# result: {point -> {point -> [(3ddirection, distance)]}}
 def find_all_directions(v,f):
     res = {}
     for curr_v in range(len(v)):
+        print 'Processing v'+str(curr_v+1)
         res[curr_v] = find_directions_by_vertex(v,f,curr_v)
     return res
 
+# check if directions of two convolutions are similar enough
 def check_possibility_of_pairing(dirs1, dirs2, min_prec):
     for (d1,dist1) in dirs1:
         for (d2,dist2) in dirs2:
             if math.fabs(np.dot(d1,d2))>=min_prec:
                 return True
     return False
+
+# save directions data to file
+def save_directions_data(data, filename):
+    try:
+        with open(filename, 'wt') as f:
+            for src in data.keys():
+                for dst in data[src].keys():
+                    for dirs in data[src][dst]:
+                        d = dirs[0]
+                        ds = dirs[1]
+                        f.write("{};{};{};{};{};{}\n".format(src, dst,
+                                                             d[0],d[1],d[2],
+                                                             ds))
+    except IOError as e:
+        print 'I/O error while saving in file {0} ({1}): {2}'.format(
+            filename, e.errno, e.strerror)
+
+# load directions data from file
+# return (success_flag, result)
+def load_directions_data(filename):
+    line_number = 1
+    result = {}
+    try:
+        with open(filename, 'rt') as f:
+            lines = f.readlines()
+            max_vertex = -1
+            for ldata in lines:
+                tokens = ldata.split(';')
+                # check structure: int;int;coords{3};dist
+                if len(tokens)!=6:
+                    raise ValueError
+                src = int(tokens[0])
+                if src>max_vertex:
+                    max_vertex = src
+                dst = int(tokens[1])
+                if dst>max_vertex:
+                    max_vertex = dst
+                direction = np.array([float(v) for v in tokens[2:5]])
+                direction = direction/np.linalg.norm(direction)
+                dist = float(tokens[5])
+                if src not in result.keys():
+                    result[src] = {}
+                if dst not in result[src].keys():
+                    result[src][dst] = []
+                result[src][dst].append((direction,dist))
+                line_number += 1
+        # fill empty directions:
+        # for each vertex index from 0 to maximal add all lists (empty)
+        for i in range(max_vertex+1):
+            if i not in result.keys():
+                result[i] = {}
+            for j in range(max_vertex+1):
+                if j not in result[i].keys():
+                    result[i][j] = []
+        return (True, result)
+    except IOError as e:
+        print 'I/O error while loading file {0} ({1}): {2}'.format(
+            filename, e.errno, e.strerror)
+    except ValueError:
+        print 'Wrong line {0} in file {1}'.format(line_number, filename)
+    return (False, {})
+
+
+# get directions to all vertices from either file or data
+def get_direcions_data(v,f,filename):
+    # try to load data from file 'filename'
+    (load_success, dirs) = load_directions_data(filename)
+    if load_success:
+        # data loaded => return values
+        return dirs
+    else:
+        # process data
+        dirs = find_all_directions(v,f)
+        # save results
+        save_directions_data(dirs, filename)
+        # return processed data
+        return dirs
 	
 # find all combinations for the convolution specified by geodetic directions
 # v: electrode positions, numpy array nv x 3
@@ -845,13 +925,13 @@ def check_possibility_of_pairing(dirs1, dirs2, min_prec):
 # Elen: maximum relative difference of distances from one vertex in list to another
 # f: faces of the triangles to calculate geodetic lines
 # return: list of lists of convolution to combine with characteristic length
-def make_geodesic_conv_combinations(v, c, N, dth, dfi, Elen, f=curr_faces):
+def make_geodesic_conv_combinations(v, c, N, dth, dfi, Elen, f=curr_faces, filename='./directions.csv'):
     cos_dth = math.cos(dth)
     cos_dfi = math.cos(dfi)
     # remove duplicate faces, detect non-manifolds
     f = process_triangles(f)
     # find directions to all other vertices for each vertex
-    dirs = find_all_directions(v,f)
+    dirs = get_direcions_data(v,f,filename)
     conv_pairs = []
     # for each convolution
     for cc in range(len(c)):
