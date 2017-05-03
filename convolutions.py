@@ -287,10 +287,10 @@ if __name__=='__main__':
     dev = GSN128()
     cn = Convolutions(dev)
     vs = VisualisationConvolutions(cn)
-    convs = cn.get_1Dconvolutions(4)
-    vs.visualise_convs_on_mne_topomap(convs)
+    convs = cn.get_1Dconvolutions(3)
+    # vs.visualise_convs_on_mne_topomap(convs)
 
-    # cross_convs = cn.get_crosses_conv(convs)
-    # vs.visualise_convs_on_mne_topomap(map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
+    cross_convs = cn.get_crosses_conv(3)
+    vs.visualise_convs_on_mne_topomap(map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
 
 

@@ -23,14 +23,14 @@ def get_base_model(input_len, fsize,channel_number):
     model = Model(input=input_seq, output=compressed)
     return model
 
-def get_full_model(channel_number,epoch_len):
+def get_full_model(epoch_len,channel_number):
     # input_quarter_seq = Input(shape=(int(epoch_len/4), channel_number))
     # input_half_seq = Input(shape=(int(epoch_len/2), channel_number))
     input_full_seq = Input(shape=(epoch_len, channel_number))
 
     # base_network_quarter = get_base_model(int(epoch_len/4), 10,channel_number)
     # base_network_half = get_base_model(int(epoch_len/2), 10,channel_number)
-    base_network_full = get_base_model(epoch_len, 10,channel_number)
+    base_network_full = get_base_model(epoch_len, fsize=10,channel_number=channel_number)
 
     # embedding_quarter = base_network_quarter(input_quarter_seq)
     # embedding_half = base_network_half(input_half_seq)
@@ -66,7 +66,7 @@ if __name__=='__main__':
     X = np.concatenate((X,Xm),axis=0)
     y = np.hstack((y,y))
     X = (X - np.mean(X, axis=0)) / np.std(X, axis=0)
-    model = get_full_model(X.shape[2],X.shape[1])
+    model = get_full_model(epoch_len = X.shape[1],channel_number = X.shape[2])
     nb_epoch = 10000
     early_stopping = EarlyStopping(monitor='val_loss', patience=100, verbose=0, mode='auto')
     tensor_board = TensorBoard(log_dir = './logs/'+str(uuid4()), histogram_freq = 3)

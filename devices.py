@@ -21,7 +21,7 @@ class Neuromag(Device):
         info_path = os.path.join(code_dir, 'neuromag_info')
         neuromag = read_raw_fif(sample.data_path() +
                                 '/MEG/sample/sample_audvis_raw.fif')
-        topography_2D = find_layout(neuromag.info, ch_type=sensor_type).pos
+        topography_2D = find_layout(neuromag.info, ch_type=sensor_type).pos[:,:2]
         if (sensor_type == 'mag'):
             topography_3D = np.array([ch['loc'][:3] for ch in neuromag.info['chs'] if
                                       (ch['ch_name'][-1] == '1') &
