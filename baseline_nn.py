@@ -70,7 +70,6 @@ if __name__=='__main__':
     nb_epoch = 10000
     early_stopping = EarlyStopping(monitor='val_loss', patience=100, verbose=0, mode='auto')
     tensor_board = TensorBoard(log_dir = './logs/'+str(uuid4()), histogram_freq = 3)
-    reduce_lr = ReduceLROnPlateau(min_lr=0,patience=50)
     with K.tf.device('/gpu:2'):
         model.fit(x=get_resampled_data(X,axis=1),y=to_onehot(y),batch_size=30, nb_epoch = nb_epoch,
-                            callbacks=[tensor_board,reduce_lr], verbose=1, validation_split=0.2,shuffle=True)
+                            callbacks=[tensor_board], verbose=1, validation_split=0.2,shuffle=True)

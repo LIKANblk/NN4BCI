@@ -20,6 +20,20 @@ class Data:
                         casting='same_kind')  # additional dimension for easier concatenation to 3d array in the future
 
 
+    def data_shuffle(self, x, y):
+        d_len = y.shape[0]
+        from random import shuffle
+        sh_data = range(d_len)
+        shuffle(sh_data)
+        new_y = np.zeros(y.shape)
+        for i in range(d_len):
+            new_y[i] = y[sh_data[i]]
+        res_x = np.zeros(x.shape)
+        for i in range(d_len):
+            res_x[i] = x[sh_data[i]]
+        return  res_x,new_y
+
+
 class GSN128Data(Data):
     def __init__(self):
         Data.__init__(self,path_to_data = 'DATA/GSN128/')
@@ -79,7 +93,8 @@ class NeuromagData(Data):
             X_tmp,y_tmp = self.get_data_from_exp(exp,target_dim_order)
             X = np.append(X,X_tmp,axis=0)
             y = np.append(y,y_tmp,axis=0)
-        return X,y
+
+        return self.data_shuffle(X,y)
 
     def get_data_from_exp(self,experiment,target_dim_order=['trial', 'channel', 'time']):
         # @dim_order - list of strings in format ['trial','channel','time']

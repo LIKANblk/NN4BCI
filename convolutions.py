@@ -254,14 +254,14 @@ class VisualisationConvolutions:
     def _visualise_target_convolutions(self, convs,conv_scores,title):
         # This function draw all specified convolution on one custom topography with direction of convolution
         #
-        resutls_dir = './resutls'
+        resutls_dir = './results'
         if not os.path.isdir(resutls_dir):
             os.makedirs(resutls_dir)
 
         self._plot_custom_topography()
         for conv_index, conv in enumerate(convs):
             plt.title('%s,svd ratio' % (title))
-            self._plot_convolution(conv, conv_scores[conv_index], radius=5, connect=False, draw_normal=True,plot_only_middle=True)
+            self._plot_convolution(conv, conv_scores[conv_index], radius=5, connect=True, draw_normal=False,plot_only_middle=False)
 
         plt.savefig(os.path.join(resutls_dir, title + '.png'))
         plt.close()
@@ -282,7 +282,7 @@ class VisualisationConvolutions:
             plt.savefig(os.path.join(test_conv, title + '.png'))
             plt.close()
 
-def Peters_test():
+def Peters_test(convs):
     import conv_trees as cc
     # test of path tracing (have no use just now)
     init_v = 0
@@ -292,21 +292,40 @@ def Peters_test():
         trace_seq = cc.trace_path(cn.topography_3D, cc.curr_faces, init_v, target_v, path)
         cc.plot_tracing_results(cn.topography_3D,cc.curr_faces,trace_seq)
     # test for convolutions --- TODO: read real convolutions
-    test_convs = np.array([])
+    test_convs = np.array(convs)
     res = cc.make_geodesic_conv_combinations(cn.topography_3D, test_convs, 3, 0.1, 0.1, 0.1, cc.curr_faces, 'directions_Real.csv')
     #plot_combination(cn.topography_3D,cc.curr_faces,test_convs,res[0][0])
+    return res
 
-    
-if __name__=='__main__':
-    dev = GSN128()
+def cross_convs_vis_test():
+    dev = Neuromag('mag')
+    cn = Convolutions(dev)
+    vs = VisualisationConvolutions(cn)
+    cross_convs = cn.get_crosses_conv(3)
+    vs.visualise_convs_on_mne_topomap(map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
+
+def convs_vis_test():
+    dev = Neuromag('mag')
     cn = Convolutions(dev)
     vs = VisualisationConvolutions(cn)
     convs = cn.get_1Dconvolutions(3)
-    # vs.visualise_convs_on_mne_topomap(convs)
-    print 'ok'
-    convs = cn.get_1Dconvolutions(4)
     vs.visualise_convs_on_mne_topomap(convs)
-    cross_convs = cn.get_crosses_conv(3)
-    vs.visualise_convs_on_mne_topomap(map(lambda inp_tuple:inp_tuple[0]+inp_tuple[1],cross_convs))
+
+if __name__=='__main__':
+    dev = Neuromag('mag')
+    cn = Convolutions(dev)
+    convs = cn.get_1Dconvolutions(3)
+    import conv_trees as cc
+    res = cc.make_geodesic_conv_combinations(dev.topography_3D, np.array(convs), 3, 0.4, 0.4, 0.3, cc.curr_faces,
+                                             'directions_Real.csv')
+    res = filter(lambda x: x[1]<0.15,res)
+    vs = VisualisationConvolutions(cn)
+    for ind,elem in enumerate(res):
+        convs_inds = elem[0]
+        tmp_convs = [convs[i] for i in convs_inds]
+        # vs.visualise_convs_on_mne_topomap(tmp_convs,'%s' % ind)
+        vs._visualise_target_convolutions(tmp_convs, np.ones(len(convs)), '%s' % ind)
+    print 'ok'
+
 
 
