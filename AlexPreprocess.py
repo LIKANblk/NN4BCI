@@ -16,13 +16,11 @@ class AlexPreprocess:
         pass
 
     
-    def extract_expert_features(self,data,convolution_indeces,ch_dim):
+    def extract_expert_features(self,data,convolution_indeces,ch_dim,beta=1):
         #TODO too slow, make parallel feature computations
         assert(data.ndim == 3)
         time_dim = data.ndim - ch_dim
         phase_data = self._calc_local_phase(data,time_dim)
-        beta = 1
-        trials,features_length,time_length = data.shape[0],len(convolution_indeces),data.shape[-1]
         res_shape = list(data.shape)
         res_shape[ch_dim] = len(convolution_indeces)
         res = np.zeros(res_shape)

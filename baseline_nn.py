@@ -1,5 +1,5 @@
 from Data import *
-from keras.layers import Convolution1D, Dense, Dropout, Input, merge, GlobalMaxPooling1D
+from keras.layers import Conv1D, Dense, Dropout, Input, merge, GlobalMaxPooling1D
 from keras.models import Model
 from keras.optimizers import RMSprop
 from keras.callbacks import EarlyStopping,TensorBoard,ReduceLROnPlateau
@@ -13,14 +13,14 @@ def get_base_model(input_len, fsize,channel_number):
     '''
     input_seq = Input(shape=(input_len, channel_number))
     nb_filters = 50
-    convolved = Convolution1D(nb_filters, fsize, border_mode="same", activation="relu")(input_seq)
+    convolved = Conv1D(nb_filters, fsize, padding="same", activation="relu")(input_seq)
     convolved = Dropout(0.7)(convolved)
     pooled = GlobalMaxPooling1D()(convolved)
     compressed = Dense(50, activation="relu")(pooled)
     compressed = Dropout(0.7)(compressed)
     compressed = Dense(50, activation="relu")(compressed)
     compressed = Dropout(0.7)(compressed)
-    model = Model(input=input_seq, output=compressed)
+    model = Model(inputs=input_seq, outputs=compressed)
     return model
 
 def get_full_model(epoch_len,channel_number):
@@ -39,7 +39,7 @@ def get_full_model(epoch_len,channel_number):
     # merged = merge([embedding_quarter, embedding_half, embedding_full], mode="concat")
     out = Dense(2, activation='softmax')(embedding_full)
 
-    model = Model(input=[input_full_seq], output=out)
+    model = Model(inputs=[input_full_seq], outputs=out)
 
     opt = RMSprop(lr=0.00005, clipvalue=10**6)
     model.compile(loss='categorical_crossentropy',metrics=['accuracy'], optimizer=opt)
@@ -56,20 +56,42 @@ def get_resampled_data(data,axis):
     epoch_len = data.shape[axis]
     return [resample(data,epoch_len/4,axis=axis),resample(data,epoch_len/2,axis=axis),data]
 
-if __name__=='__main__':
+def generator_approach():
     data_source = NeuromagData('mag')
-    dim_order = ['trial','time','channel']
-    X,y=data_source.get_all_experiments_data(dim_order)
+    from itertools import imap
     dev = Neuromag('mag')
-    augmenter = DataAugmentation(device=dev)
-    Xm = augmenter.mirror_sensors(X)
-    X = np.concatenate((X,Xm),axis=0)
-    y = np.hstack((y,y))
-    X = (X - np.mean(X, axis=0)) / np.std(X, axis=0)
-    model = get_full_model(epoch_len = X.shape[1],channel_number = X.shape[2])
+    def data_augmenter(X,y):
+        augmenter = DataAugmentation(device=dev)
+        Xm = augmenter.mirror_sensors(X)
+        X = np.concatenate((X,Xm),axis=0)
+        y = np.vstack((y,y))
+        return X,y
+
+    dim_order = ['trial', 'time', 'channel']
+    new_gen = imap(lambda x:data_augmenter(*x),data_source.get_batch_generator(50,data_source.get_all_names(),target_dim_order=dim_order))
+
+    model = get_full_model(epoch_len=1125, channel_number=102)
     nb_epoch = 10000
-    early_stopping = EarlyStopping(monitor='val_loss', patience=100, verbose=0, mode='auto')
-    tensor_board = TensorBoard(log_dir = './logs/'+str(uuid4()), histogram_freq = 3)
+    tensor_board = TensorBoard(log_dir='./logs/' + str(uuid4()), histogram_freq=3)
     with K.tf.device('/gpu:2'):
-        model.fit(x=get_resampled_data(X,axis=1),y=to_onehot(y),batch_size=30, nb_epoch = nb_epoch,
-                            callbacks=[tensor_board], verbose=1, validation_split=0.2,shuffle=True)
+        model.fit_generator(new_gen, steps_per_epoch=200, epochs=nb_epoch,
+                  callbacks=[tensor_board], verbose=1)
+
+if __name__=='__main__':
+    # data_source = NeuromagData('mag')
+    # dim_order = ['trial','time','channel']
+    # X,y=data_source.get_all_experiments_data(dim_order)
+    # dev = Neuromag('mag')
+    # augmenter = DataAugmentation(device=dev)
+    # Xm = augmenter.mirror_sensors(X)
+    # X = np.concatenate((X,Xm),axis=0)
+    # y = np.hstack((y,y))
+    # X = (X - np.mean(X, axis=0)) / np.std(X, axis=0)
+    # model = get_full_model(epoch_len = X.shape[1],channel_number = X.shape[2])
+    # nb_epoch = 10000
+    # early_stopping = EarlyStopping(monitor='val_loss', patience=50, verbose=0, mode='auto')
+    # tensor_board = TensorBoard(log_dir = './logs/'+str(uuid4()), histogram_freq = 3)
+    # with K.tf.device('/gpu:2'):
+    #     model.fit(x=get_resampled_data(X,axis=1),y=to_onehot(y),batch_size=30, nb_epoch = nb_epoch,
+    #                         callbacks=[tensor_board], verbose=1, validation_split=0.2,shuffle=True)
+    generator_approach()
