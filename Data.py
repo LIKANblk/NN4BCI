@@ -106,7 +106,7 @@ class NeuromagData(Data):
         def_configuration = ['trial', 'channel', 'time']
         transpose_mask = [def_configuration.index(dim) for dim in target_dim_order]
 
-        X = np.empty((0, self.num_channels, self.time_length), dtype=np.float64).transpose(transpose_mask)
+        X = np.empty((0, self.num_channels, self.time_length), dtype=np.float64)
         y = np.empty((0), dtype=np.int)
         for index,label in enumerate(labels):
             tmp = self.get_data_by_label(experiment,label)

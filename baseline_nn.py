@@ -75,7 +75,7 @@ def generator_approach():
     tensor_board = TensorBoard(log_dir='./logs/' + str(uuid4()), histogram_freq=3)
     with K.tf.device('/gpu:2'):
         model.fit_generator(new_gen, steps_per_epoch=200, epochs=nb_epoch,
-                  callbacks=[tensor_board], verbose=1)
+                  callbacks=[tensor_board], verbose=2)
 
 if __name__=='__main__':
     # data_source = NeuromagData('mag')
