@@ -1,6 +1,6 @@
 
 from scipy.linalg import norm
-from scipy.signal import hilbert
+from scipy.signal import hilbert,butter,lfilter
 from itertools import combinations
 from Data import *
 from convolutions import *
@@ -15,11 +15,22 @@ class AlexPreprocess:
     def __init__(self):
         pass
 
+    def bandpass_filter(self,data,time_axis,lowcut, highcut, fs=1000, order=5):
+        nyq = 0.5 * fs
+        low = lowcut / nyq
+        high = highcut / nyq
+        b, a = butter(order, [low, high], btype='band')
+
+        y = lfilter(b, a, data,axis=time_axis)
+        return y
+
+
     
     def extract_expert_features(self,data,convolution_indeces,ch_dim,beta=1):
         #TODO too slow, make parallel feature computations
         assert(data.ndim == 3)
         time_dim = data.ndim - ch_dim
+        data = self.bandpass_filter(data, time_dim, lowcut=8, highcut=14, fs=1000, order=5)
         phase_data = self._calc_local_phase(data,time_dim)
         res_shape = list(data.shape)
         res_shape[ch_dim] = len(convolution_indeces)

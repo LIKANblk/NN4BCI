@@ -76,10 +76,11 @@ class NeuromagData(Data):
             self.num_channels = 204
         self.time_length = (epoch_end - epoch_start) - (saccade_end - saccade_start)
         Data.__init__(self,path_to_data = os.path.join('DATA','Neuromag'))
+        self.exp_names = (self.get_experiments_names())
 
 
     def get_data_labels(self):
-        experiment_name = self.get_exeriments_names()[0]
+        experiment_name = self.exp_names[0]
         is_dir = lambda filename: os.path.isdir(os.path.join(self.path_to_data,experiment_name,filename))
         return filter(is_dir, os.listdir(os.path.join(self.path_to_data,experiment_name)))
 
@@ -87,10 +88,9 @@ class NeuromagData(Data):
         #label_each_exp - if True target class in each experiment will have unique label (number of experiment)
         def_configuration = ['trial', 'channel', 'time']
         transpose_mask = [def_configuration.index(dim) for dim in target_dim_order]
-        experiments = self.get_exeriments_names()
         X = np.empty((0, self.num_channels, self.time_length), dtype=np.float64).transpose(transpose_mask)
         y = np.empty((0), dtype=np.int)
-        for exp_num,exp_name in enumerate(experiments):
+        for exp_num,exp_name in enumerate(self.exp_names):
             X_tmp,y_tmp = self.get_data_from_exp(exp_name,target_dim_order,normalise)
             X = np.append(X,X_tmp,axis=0)
             if label_each_exp:
@@ -133,21 +133,26 @@ class NeuromagData(Data):
         time_mask = self.get_time_mask(data.shape[2])
         return data[:,:,time_mask]
 
-    def get_exeriments_names(self):
+    def get_experiments_names(self):
         is_dir = lambda filename: os.path.isdir(os.path.join(self.path_to_data, filename))
         return sorted(filter(is_dir, os.listdir(self.path_to_data)))
 
-    def get_all_names(self):
-        exp_names = self.get_exeriments_names()
+    def get_all_names(self,val,val_split=0.2):
         labels = self.get_data_labels()
         # res = {exp_index:[] for exp_index in range(len(exp_names)+1)}
         res = []
         list_dir = lambda path,label: sorted([(os.path.join(path,f),label) for f in os.listdir(path) if f.endswith(".mat")])
-        for exp_index,exp_name in enumerate(exp_names):
+        for exp_index,exp_name in enumerate(self.exp_names):
             path_to_target = os.path.join(self.path_to_data,exp_name,labels[1])
             path_to_nontarget = os.path.join(self.path_to_data, exp_name, labels[0])
             target = list_dir(path_to_target,exp_index+1)
             nontarget = list_dir(path_to_nontarget,0)
+            if val:
+                target = target[-int(np.ceil(len(target) * (1 - val_split))):]
+                nontarget = nontarget[-int(np.ceil(len(nontarget) * (1-val_split))):]
+            else:
+                target = target[:int(np.floor(len(target)*(1-val_split)))]
+                nontarget = nontarget[:int(np.floor(len(nontarget) * (1-val_split)))]
             res +=target
             res += nontarget
         return res
@@ -155,10 +160,11 @@ class NeuromagData(Data):
     def read_mat_from_files(self,files):
         return np.concatenate([self.process_mat_file(f) for f in files], axis=0)
 
-    def get_random_batch(self,batchsize,all_data_files,target_dim_order,normalise=False):
+    def get_random_batch(self,batchsize,all_data_files,target_dim_order,normalise=False,label_each_exp=True):
         def to_onehot(y):
-            onehot = np.zeros((len(y), 2))
-            y=[int(elem>0) for elem in y]
+            onehot = np.zeros((len(y), len(self.exp_names)+1))
+            if not label_each_exp:
+                y=[int(elem>0) for elem in y]
             onehot[range(len(y)), y] = 1
             return onehot
         indexes = sample(range(len(all_data_files)),batchsize)
@@ -168,16 +174,18 @@ class NeuromagData(Data):
         time_mask = self.get_time_mask(batch.shape[-1])
         batch = batch[:,:,time_mask]
         batch = batch[:, self.sensor_mask, :]
-        batch = (batch - np.mean(batch, axis=0)) / np.std(batch, axis=0)
+        if normalise:
+            batch = (batch - np.mean(batch, axis=0)) / np.std(batch, axis=0)
 
         def_configuration = ['trial', 'channel', 'time']
         transpose_mask = [def_configuration.index(dim) for dim in target_dim_order]
 
         return batch.transpose(transpose_mask),to_onehot(labels)
 
-    def get_batch_generator(self,batchsize,all_data_files,target_dim_order):
+    def get_batch_generator(self,batchsize,all_data_files,target_dim_order,normalise=False,label_each_exp=True):
+
         while True:
-            yield self.get_random_batch(batchsize, all_data_files, target_dim_order)
+            yield self.get_random_batch(batchsize, all_data_files, target_dim_order,normalise,label_each_exp)
 
 class DataAugmentation:
     def __init__(self,device):

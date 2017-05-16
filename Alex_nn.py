@@ -9,6 +9,7 @@ from uuid import uuid4
 from convolutions import *
 import conv_trees as cc
 from AlexPreprocess import *
+from itertools import imap
 
 
 def get_base_model(input_len, fsize,feature_number,seq_length):
@@ -64,38 +65,65 @@ def data_placement(data,conv_seqs):
             res_time_counter+=1
     return res
 
-if __name__=='__main__':
-
+def full_data_approach():
+    # RAM consuming
     data_source = NeuromagData('mag')
-    dim_order = ['trial','time','channel']
-    X, y = data_source.get_all_experiments_data(target_dim_order=['trial', 'time', 'channel'],label_each_exp=True)
+    dim_order = ['trial', 'time', 'channel']
+    X, y = data_source.get_all_experiments_data(target_dim_order=dim_order, label_each_exp=True)
     num_of_classes = len(data_source.get_exeriments_names()) + 1
     dev = Neuromag('mag')
     convs = Convolutions(dev).get_1Dconvolutions(conv_length=3)
     conv_seqs = cc.make_geodesic_conv_combinations(dev.topography_3D, np.array(convs), 3, 0.4, 0.4, 0.3, cc.curr_faces,
-                                             'directions_Real.csv')
+                                                   'directions_Real.csv')
     conv_seqs = np.array([elem[0] for elem in conv_seqs if (elem[1] < 0.15)])
-    X = AlexPreprocess().extract_expert_features(X,convs,ch_dim=2,beta=0.1)
+    X = AlexPreprocess().extract_expert_features(X, convs, ch_dim=2, beta=0.1)
     X = data_placement(X, conv_seqs)
-    model = get_full_model(epoch_len=X.shape[1], feature_number=X.shape[2],seq_length=conv_seqs.shape[1],classes_num=num_of_classes)
+    model = get_full_model(epoch_len=X.shape[1], feature_number=X.shape[2], seq_length=conv_seqs.shape[1],
+                           classes_num=num_of_classes)
     nb_epoch = 10000
     early_stopping = EarlyStopping(monitor='val_loss', patience=100, verbose=0, mode='auto')
-    tensor_board = TensorBoard(log_dir = './logs/'+str(uuid4()), histogram_freq = 3)
+    tensor_board = TensorBoard(log_dir='./logs/' + str(uuid4()), histogram_freq=3)
     with K.tf.device('/gpu:2'):
-        model.fit(x=X,y=to_onehot(y,num_of_classes),batch_size=20, nb_epoch = nb_epoch,
-                            callbacks=[tensor_board], verbose=1, validation_split=0.2,shuffle=True)
+        model.fit(x=X, y=to_onehot(y, num_of_classes), batch_size=20, nb_epoch=nb_epoch,
+                  callbacks=[tensor_board], verbose=1, validation_split=0.2, shuffle=True)
     print 'ok'
-	
 
-    # augmenter = DataAugmentation(device=dev)
-    # Xm = augmenter.mirror_sensors(X)
-    # X = np.concatenate((X,Xm),axis=0)
-    # y = np.hstack((y,y))
-    # X = (X - np.mean(X, axis=0)) / np.std(X, axis=0)
-    # model = get_full_model(epoch_len = X.shape[1],channel_number = X.shape[2])
-    # nb_epoch = 10000
+def generator_approach():
+    # Generator approach for large amount of data
+
+    dim_order = ['trial', 'time', 'channel']
+
+    data_source = NeuromagData('mag')
+    num_of_classes = len(data_source.exp_names) + 1
+    dev = Neuromag('mag')
+    convs = Convolutions(dev).get_1Dconvolutions(conv_length=3)
+    conv_seqs = cc.make_geodesic_conv_combinations(dev.topography_3D, np.array(convs), 3, 0.4, 0.4, 0.3, cc.curr_faces,
+                                                   'directions_Real.csv')
+    conv_seqs = np.array([elem[0] for elem in conv_seqs if (elem[1] < 0.15)])
+
+    f = lambda x,:data_placement(AlexPreprocess().extract_expert_features(x, convs, ch_dim=2, beta=0.1), conv_seqs)
+    train_gen = imap(lambda x: (f(x[0]),x[1]),
+                   data_source.get_batch_generator(50, data_source.get_all_names(val=False),
+                                                   target_dim_order=dim_order,normalise=False,label_each_exp=True))
+
+    val_gen = imap(lambda x: (f(x[0]), x[1]),
+                   data_source.get_batch_generator(50, data_source.get_all_names(val=True),
+                                                   target_dim_order=dim_order,normalise=False,label_each_exp=True))
+    num_seqs = conv_seqs.shape[0]
+    seq_length = conv_seqs.shape[1]
+    data_source = NeuromagData('mag')
+    time_length =(data_source.time_length - (seq_length-1))*seq_length
+    model = get_full_model(epoch_len=time_length,
+                           feature_number=num_seqs, seq_length=seq_length,
+                           classes_num=num_of_classes)
+    nb_epoch = 10000
     # early_stopping = EarlyStopping(monitor='val_loss', patience=100, verbose=0, mode='auto')
-    # tensor_board = TensorBoard(log_dir = './logs/'+str(uuid4()), histogram_freq = 3)
-    # with K.tf.device('/gpu:2'):
-    #     model.fit(x=get_resampled_data(X,axis=1),y=to_onehot(y),batch_size=30, nb_epoch = nb_epoch,
-    #                         callbacks=[tensor_board], verbose=1, validation_split=0.2,shuffle=True)
+    tensor_board = TensorBoard(log_dir='./logs/' + str(uuid4()), histogram_freq=3)
+    with K.tf.device('/gpu:2'):
+        model.fit_generator(generator=train_gen, steps_per_epoch=20, epochs=nb_epoch,
+                            callbacks=[tensor_board], verbose=1,validation_steps=4,validation_data=val_gen)
+    print 'ok'
+
+if __name__=='__main__':
+    generator_approach()
+
